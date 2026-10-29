@@ -1,7 +1,7 @@
 {
-  "name": "your-project",
+  "name": "bup-ice-portal",
   "main": "src/index.js",
-  "compatibility_date": "2026-10-30",
+  "compatibility_date": "2026-10-28",
   "assets": {
     "directory": "./public",
     "binding": "ASSETS"
