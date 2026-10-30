@@ -6,6 +6,15 @@ const CATEGORIES = ["Class", "Assignment", "Quiz / CT", "Exam", "Other"];
 const SESSION_SECONDS = 7 * 24 * 60 * 60; // 7 days
 const enc = new TextEncoder();
 
+// Works with both a plain Worker secret (string) and a Secrets Store binding (object with .get()).
+async function getSecret(env, name) {
+  const v = env[name];
+  if (!v) return "";
+  if (typeof v === "string") return v;
+  if (typeof v.get === "function") return String((await v.get()) ?? "");
+  return "";
+}
+
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
     status,
@@ -36,13 +45,13 @@ function safeEqual(a, b) {
   return diff === 0;
 }
 
-function sessionSecret(env) {
-  return env.SESSION_SECRET || env.ADMIN_PASSWORD;
+async function sessionSecret(env) {
+  return (await getSecret(env, "SESSION_SECRET")) || (await getSecret(env, "ADMIN_PASSWORD"));
 }
 
 async function makeSessionToken(env) {
   const exp = Date.now() + SESSION_SECONDS * 1000;
-  const sig = await hmacHex(sessionSecret(env), "session:" + exp);
+  const sig = await hmacHex(await sessionSecret(env), "session:" + exp);
   return `${exp}.${sig}`;
 }
 
@@ -61,7 +70,7 @@ async function isAdmin(request, env) {
   const [expStr, sig] = token.split(".");
   const exp = Number(expStr);
   if (!exp || !sig || exp < Date.now()) return false;
-  const expected = await hmacHex(sessionSecret(env), "session:" + exp);
+  const expected = await hmacHex(await sessionSecret(env), "session:" + exp);
   return safeEqual(sig, expected);
 }
 
@@ -122,7 +131,8 @@ async function handleApi(request, env, url) {
   }
 
   if (!env.DB) return json({ error: "Database is not connected." }, 500);
-  if (!env.ADMIN_PASSWORD) return json({ error: "Admin password is not configured." }, 500);
+  const adminPassword = await getSecret(env, "ADMIN_PASSWORD");
+  if (!adminPassword) return json({ error: "Admin password is not configured." }, 500);
 
   // Basic CSRF protection for state-changing requests
   if (method !== "GET" && method !== "HEAD") {
@@ -151,7 +161,7 @@ async function handleApi(request, env, url) {
   if (path === "/api/login" && method === "POST") {
     const { password } = await readBody(request);
     const a = await hmacHex("password-check", String(password ?? ""));
-    const b = await hmacHex("password-check", env.ADMIN_PASSWORD);
+    const b = await hmacHex("password-check", adminPassword);
     if (!safeEqual(a, b)) {
       await new Promise((r) => setTimeout(r, 500)); // slow down guessing
       return json({ error: "Incorrect password." }, 401);
