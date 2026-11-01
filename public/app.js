@@ -43,7 +43,7 @@ function buildCtSlider() {
     slide.setAttribute("role", "group"); slide.setAttribute("aria-roledescription", "slide"); slide.setAttribute("aria-label", `CT ${i + 1} of ${CT_SLOTS}`);
     const card = el("div", "ct-card");
     const top = el("div", "ct-top"); const head = el("div");
-    const eyebrow = el("div", "eyebrow light", `CLASS TEST ${i + 1}`); const title = el("h2"); const meta = el("p");
+    const eyebrow = el("div", "eyebrow light", `Class test ${i + 1}`); const title = el("h2"); const meta = el("p");
     head.append(eyebrow, title, meta);
     const status = el("span", "pill"); top.append(head, status);
     const countdown = el("div", "countdown"); const nums = {};
@@ -51,7 +51,7 @@ function buildCtSlider() {
       const box = el("div"); const num = el("strong", "", "--"); box.append(num, el("span", "", label)); countdown.append(box); nums[key] = num;
     });
     const syllabus = el("div", "syllabus"); const sHead = el("div", "syllabus-heading");
-    sHead.append(el("span", "mini-label", "SYLLABUS"), el("span", "syllabus-icon", "✓"));
+    sHead.append(el("span", "mini-label", "Syllabus"), el("span", "syllabus-icon", "✓"));
     const sText = el("div", "syllabus-text"); sText.tabIndex = 0;
     syllabus.append(sHead, sText);
     card.append(top, countdown, syllabus); slide.append(card); track.append(slide);
@@ -105,10 +105,10 @@ function tickCountdown() {
     const r = ctRefs[i]; if (!r) return;
     const setAll = (v) => ["days", "hours", "minutes", "seconds"].forEach(k => r.nums[k].textContent = v);
     const target = ct.datetime ? new Date(ct.datetime).getTime() : NaN;
-    if (Number.isNaN(target)) { r.status.textContent = "SCHEDULE TBD"; setAll("--"); return; }
+    if (Number.isNaN(target)) { r.status.textContent = "Schedule TBD"; setAll("--"); return; }
     const diff = target - Date.now();
-    if (diff <= 0) { r.status.textContent = "TIME REACHED"; setAll("00"); return; }
-    r.status.textContent = "COUNTING DOWN";
+    if (diff <= 0) { r.status.textContent = "Time reached"; setAll("00"); return; }
+    r.status.textContent = "Counting down";
     const units = { days: 86400000, hours: 3600000, minutes: 60000, seconds: 1000 };
     let remaining = diff;
     for (const [key, unit] of Object.entries(units)) { const n = Math.floor(remaining / unit); r.nums[key].textContent = String(n).padStart(2, "0"); remaining -= n * unit; }
@@ -123,10 +123,10 @@ function renderNotices() {
   list.classList.toggle("hidden", filtered.length === 0);
   if (!filtered.length) return;
   for (const n of filtered) {
-    const article = document.createElement("article"); article.className = "notice-card";
+    const article = document.createElement("article"); article.className = "notice-card" + (n.pinned ? " is-pinned" : "");
     const meta = document.createElement("div"); meta.className = "notice-meta";
     const category = document.createElement("span"); category.className = "category"; category.textContent = n.category;
-    const pinned = document.createElement("span"); pinned.className = "pinned"; pinned.textContent = n.pinned ? "📌 PINNED" : "";
+    const pinned = document.createElement("span"); pinned.className = "pinned"; pinned.textContent = n.pinned ? "Pinned" : "";
     meta.append(category, pinned);
     const title = document.createElement("h3"); title.textContent = n.title;
     const body = document.createElement("div"); body.className = "notice-body"; body.textContent = n.body;
@@ -249,3 +249,4 @@ buildCtFields();
 initCtSlider();
 setInterval(() => tickCountdown(), 1000);
 loadData();
+if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
