@@ -8,40 +8,194 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+  <!-- Top Navigation Bar -->
   <header class="topbar">
-    <a class="brand" href="/" aria-label="BUP ICE Class Updates home"><span class="brand-mark">ICE</span><span><strong>BUP ICE</strong><small>CLASS UPDATE PORTAL</small></span></a>
-    <div class="top-actions"><span class="live-dot"></span><span class="live-label">Class notice board</span><button id="adminOpen" class="button button-outline">CR Login</button></div>
+    <a class="brand" href="/" aria-label="BUP ICE Class Updates home">
+      <span class="brand-mark">ICE</span>
+      <span>
+        <strong>BUP ICE</strong>
+        <small>CLASS UPDATE PORTAL</small>
+      </span>
+    </a>
+    <div class="top-actions">
+      <span class="live-dot"></span>
+      <span class="live-label">Class notice board</span>
+      <button id="adminOpen" class="button button-outline">CR Login</button>
+    </div>
   </header>
 
+  <!-- Main Content Container -->
   <main class="container">
+    
+    <!-- Hero Section -->
     <section class="hero">
-      <div class="hero-copy"><div class="eyebrow">INFORMATION & COMMUNICATION ENGINEERING</div><h1>Your class.<br><span>Rakib and Lamiya.</span></h1><p>Class notices, assignments, quizzes and CT syllabus — updated by your class representative.</p></div>
-      <div class="hero-stats"><div class="stat"><span class="stat-icon">◷</span><div><strong id="monthLabel">This month</strong><small>Class test countdown</small></div></div><div class="stat"><span class="stat-icon">▤</span><div><strong id="noticeCount">0 updates</strong><small>Published notices</small></div></div></div>
+      <div class="hero-copy">
+        <div class="eyebrow">INFORMATION & COMMUNICATION ENGINEERING</div>
+        <h1>Your class.<br><span>One reliable update.</span></h1>
+        <p>Class notices, assignments, quizzes and CT syllabus — updated by your class representative.</p>
+      </div>
+      <div class="hero-stats">
+        <div class="stat">
+          <span class="stat-icon">◷</span>
+          <div>
+            <strong id="monthLabel">This month</strong>
+            <small>Class test countdown</small>
+          </div>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">▤</span>
+          <div>
+            <strong id="noticeCount">0 updates</strong>
+            <small>Published notices</small>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <section class="ct-card" aria-labelledby="ctTitle">
-      <div class="ct-top"><div><div class="eyebrow light">CURRENT MONTH · CLASS TEST</div><h2 id="ctTitle">Class Test Countdown</h2><p id="ctMeta">The CR will update the CT schedule.</p></div><span class="pill" id="ctStatus">SCHEDULE TBD</span></div>
-      <div class="countdown" aria-label="Time until class test"><div><strong id="days">--</strong><span>Days</span></div><div><strong id="hours">--</strong><span>Hours</span></div><div><strong id="minutes">--</strong><span>Minutes</span></div><div><strong id="seconds">--</strong><span>Seconds</span></div></div>
-      <div class="syllabus"><div class="syllabus-heading"><div><span class="mini-label">CT SYLLABUS</span><h3 id="syllabusTitle">Syllabus will appear here</h3></div><span class="syllabus-icon">✓</span></div><div id="syllabusText" class="syllabus-text">The CR can publish the class test syllabus from the admin panel.</div></div>
+    <!-- Class Test Countdown Section -->
+    <section id="ctWrap" class="ct-wrap" aria-label="Class test countdowns" aria-roledescription="carousel">
+      <div id="ctSlider" class="ct-slider"></div>
+      <div id="ctDots" class="ct-dots"></div>
     </section>
 
+    <!-- Updates Section -->
     <section class="updates-section">
-      <div class="section-heading"><div><div class="eyebrow">STAY IN THE LOOP</div><h2>Latest class updates</h2></div><button id="refreshBtn" class="button button-soft">↻ Refresh</button></div>
-      <div class="filters"><button class="filter active" data-filter="all">All updates</button><button class="filter" data-filter="Class">Class</button><button class="filter" data-filter="Assignment">Assignment</button><button class="filter" data-filter="Quiz / CT">Quiz / CT</button><button class="filter" data-filter="Exam">Exam</button><button class="filter" data-filter="Other">Other</button></div>
-      <div id="noticeList" class="notice-list"><div class="loading-card">Loading class updates…</div></div>
-      <div id="emptyState" class="empty-state hidden"><div class="empty-symbol">▤</div><h3>No updates yet</h3><p>New class notices will appear here when the CR publishes them.</p></div>
+      <div class="section-heading">
+        <div>
+          <div class="eyebrow">STAY IN THE LOOP</div>
+          <h2>Latest class updates</h2>
+        </div>
+        <button id="refreshBtn" class="button button-soft">↻ Refresh</button>
+      </div>
+
+      <!-- Filters -->
+      <div class="filters">
+        <button class="filter active" data-filter="all">All updates</button>
+        <button class="filter" data-filter="Class">Class</button>
+        <button class="filter" data-filter="Assignment">Assignment</button>
+        <button class="filter" data-filter="Quiz / CT">Quiz / CT</button>
+        <button class="filter" data-filter="Exam">Exam</button>
+        <button class="filter" data-filter="Other">Other</button>
+      </div>
+
+      <!-- Notice List & Empty State -->
+      <div id="noticeList" class="notice-list">
+        <div class="loading-card">Loading class updates…</div>
+      </div>
+      <div id="emptyState" class="empty-state hidden">
+        <div class="empty-symbol">▤</div>
+        <h3>No updates yet</h3>
+        <p>New class notices will appear here when the CR publishes them.</p>
+      </div>
     </section>
-    <footer><span>Made for BUP ICE students</span><span>Check official class instructions when in doubt.</span></footer>
+
+    <!-- Footer -->
+    <footer>
+      <span>Made for BUP ICE students</span>
+      <span>Check official class instructions when in doubt.</span>
+    </footer>
   </main>
 
-  <div id="loginModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><div class="modal-backdrop" data-close="loginModal"></div><div class="modal-card"><button class="modal-close" data-close="loginModal" aria-label="Close">×</button><div class="modal-icon">⌁</div><div class="eyebrow">REPRESENTATIVE ACCESS</div><h2 id="loginTitle">CR login</h2><p>Sign in to publish class notices and update the CT syllabus.</p><form id="loginForm"><label for="adminPassword">Admin password</label><input id="adminPassword" type="password" autocomplete="current-password" required placeholder="Enter CR password"><button class="button button-primary full-width" type="submit">Login securely</button><div id="loginError" class="form-error" role="alert"></div></form><small class="muted">Only the authorized CR should use this panel.</small></div></div>
+  <!-- Login Modal -->
+  <div id="loginModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <div class="modal-backdrop" data-close="loginModal"></div>
+    <div class="modal-card">
+      <button class="modal-close" data-close="loginModal" aria-label="Close">×</button>
+      <div class="modal-icon">⌁</div>
+      <div class="eyebrow">REPRESENTATIVE ACCESS</div>
+      <h2 id="loginTitle">CR login</h2>
+      <p>Sign in to publish class notices and update the CT syllabus.</p>
+      <form id="loginForm">
+        <label for="adminPassword">Admin password</label>
+        <input id="adminPassword" type="password" autocomplete="current-password" required placeholder="Enter CR password">
+        <button class="button button-primary full-width" type="submit">Login securely</button>
+        <div id="loginError" class="form-error" role="alert"></div>
+      </form>
+      <small class="muted">Only the authorized CR should use this panel.</small>
+    </div>
+  </div>
 
-  <div id="adminModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="adminTitle"><div class="modal-backdrop" data-close="adminModal"></div><div class="modal-card admin-card"><button class="modal-close" data-close="adminModal" aria-label="Close">×</button><div class="eyebrow">MANAGE CLASS INFORMATION</div><h2 id="adminTitle">CR Admin Panel</h2><p class="modal-intro">Changes are saved to the shared class website.</p>
-    <div class="admin-tabs"><button class="admin-tab active" data-tab="noticeEditor">Publish notice</button><button class="admin-tab" data-tab="ctEditor">CT & syllabus</button><button class="admin-tab" id="logoutBtn">Logout</button></div>
-    <section id="noticeEditor" class="admin-pane"><form id="noticeForm"><input id="editingId" type="hidden"><label for="noticeTitle">Notice title</label><input id="noticeTitle" maxlength="140" required placeholder="e.g. Structured Programming class rescheduled"><div class="form-row"><div><label for="noticeCategory">Category</label><select id="noticeCategory"><option>Class</option><option>Assignment</option><option>Quiz / CT</option><option>Exam</option><option>Other</option></select></div><div><label for="noticeDate">Relevant date (optional)</label><input id="noticeDate" type="date"></div></div><label for="noticeBody">Details</label><textarea id="noticeBody" rows="5" maxlength="6000" required placeholder="Write the update clearly…"></textarea><label class="checkbox-label"><input id="noticePinned" type="checkbox"> Pin this notice at the top</label><div class="form-row"><button id="cancelEdit" class="button button-soft hidden" type="button">Cancel edit</button><button class="button button-primary" type="submit">Publish notice</button></div><div id="noticeFormMessage" class="form-message" role="status"></div></form><div class="admin-existing"><h3>Manage published notices</h3><div id="adminNoticeList" class="admin-notice-list">Loading…</div></div></section>
-    <section id="ctEditor" class="admin-pane hidden"><form id="ctForm"><label for="ctDate">Class test date & time</label><input id="ctDate" type="datetime-local"><small class="field-help">Use your local Bangladesh time. The countdown is based on this date and time.</small><label for="ctSyllabusTitle">Syllabus heading</label><input id="ctSyllabusTitle" maxlength="140" placeholder="e.g. CT-2 Syllabus — Discrete Mathematics"><label for="ctSyllabus">Syllabus details</label><textarea id="ctSyllabus" rows="7" maxlength="8000" placeholder="Write chapters, topics, sections or instructions. New lines are preserved."></textarea><button class="button button-primary full-width" type="submit">Save CT schedule & syllabus</button><div id="ctFormMessage" class="form-message" role="status"></div></form><div class="notice-tip"><strong>Tip</strong><p>Update the CT date and syllabus whenever the schedule changes. The public countdown will update automatically.</p></div></section>
-  </div></div>
+  <!-- Admin Panel Modal -->
+  <div id="adminModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
+    <div class="modal-backdrop" data-close="adminModal"></div>
+    <div class="modal-card admin-card">
+      <button class="modal-close" data-close="adminModal" aria-label="Close">×</button>
+      <div class="eyebrow">MANAGE CLASS INFORMATION</div>
+      <h2 id="adminTitle">CR Admin Panel</h2>
+      <p class="modal-intro">Changes are saved to the shared class website.</p>
+      
+      <!-- Admin Navigation Tabs -->
+      <div class="admin-tabs">
+        <button class="admin-tab active" data-tab="noticeEditor">Publish notice</button>
+        <button class="admin-tab" data-tab="ctEditor">CT & syllabus</button>
+        <button class="admin-tab" id="logoutBtn">Logout</button>
+      </div>
+
+      <!-- Notice Editor Pane -->
+      <section id="noticeEditor" class="admin-pane">
+        <form id="noticeForm">
+          <input id="editingId" type="hidden">
+          <label for="noticeTitle">Notice title</label>
+          <input id="noticeTitle" maxlength="140" required placeholder="e.g. Structured Programming class rescheduled">
+          
+          <div class="form-row">
+            <div>
+              <label for="noticeCategory">Category</label>
+              <select id="noticeCategory">
+                <option>Class</option>
+                <option>Assignment</option>
+                <option>Quiz / CT</option>
+                <option>Exam</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div>
+              <label for="noticeDate">Relevant date (optional)</label>
+              <input id="noticeDate" type="date">
+            </div>
+          </div>
+
+          <label for="noticeBody">Details</label>
+          <textarea id="noticeBody" rows="5" maxlength="6000" required placeholder="Write the update clearly…"></textarea>
+          
+          <label class="checkbox-label">
+            <input id="noticePinned" type="checkbox"> Pin this notice at the top
+          </label>
+
+          <div class="form-row">
+            <button id="cancelEdit" class="button button-soft hidden" type="button">Cancel edit</button>
+            <button class="button button-primary" type="submit">Publish notice</button>
+          </div>
+          <div id="noticeFormMessage" class="form-message" role="status"></div>
+        </form>
+
+        <div class="admin-existing">
+          <h3>Manage published notices</h3>
+          <div id="adminNoticeList" class="admin-notice-list">Loading…</div>
+        </div>
+      </section>
+
+      <!-- CT & Syllabus Editor Pane -->
+      <section id="ctEditor" class="admin-pane hidden">
+        <form id="ctForm">
+          <div id="ctFields"></div>
+          <small class="field-help">Use your local Bangladesh time. Each countdown card is based on its own date and time. Leave a CT empty to show it as "not scheduled".</small>
+          <button class="button button-primary full-width" type="submit">Save all CT cards</button>
+          <div id="ctFormMessage" class="form-message" role="status"></div>
+        </form>
+        <div class="notice-tip">
+          <strong>Tip</strong>
+          <p>The 4 cards slide automatically on the public page. Update a CT title, date or syllabus any time and the countdown changes by itself.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Toast Notifications -->
   <div id="toast" class="toast" role="status"></div>
-<script src="./app.js" defer></script>
+
+  <!-- Script File -->
+  <script src="./app.js" defer></script>
 </body>
 </html>
+```[cite: 2]
