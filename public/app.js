@@ -18,29 +18,101 @@ function formatCreated(value) {
   return "Posted " + prettyDate(normalized, true);
 }
 function currentMonthLabel() { return new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "Asia/Dhaka" }).format(new Date()); }
-function renderCountdown() {
+const CT_SLOTS = 4;
+const CT_SYLLABUS_MAX = 1500;
+const CT_AUTO_MS = 6000;
+let ctRefs = [], ctDotEls = [], ctIndex = 0, ctAutoTimer = null, ctHold = 0, ctScrollTimer;
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+function el(tag, className, text) { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
+function getCts() {
   const s = appState.settings || {};
-  $("#monthLabel").textContent = currentMonthLabel();
-  $("#ctMeta").textContent = s.ct_datetime ? "Scheduled for " + prettyDate(s.ct_datetime, true) + " (Bangladesh time)" : "The CR will update the CT schedule.";
-  const status = $("#ctStatus");
-  if (!s.ct_datetime) {
-    status.textContent = "SCHEDULE TBD";
-    ["days", "hours", "minutes", "seconds"].forEach(id => $("#" + id).textContent = "--");
-  } else {
-    const target = new Date(s.ct_datetime).getTime();
-    const diff = target - Date.now();
-    if (diff <= 0) {
-      status.textContent = "TIME REACHED";
-      ["days", "hours", "minutes", "seconds"].forEach(id => $("#" + id).textContent = "00");
-    } else {
-      status.textContent = "COUNTING DOWN";
-      const units = { days: 86400000, hours: 3600000, minutes: 60000, seconds: 1000 };
-      let remaining = diff;
-      for (const [id, unit] of Object.entries(units)) { const n = Math.floor(remaining / unit); $("#" + id).textContent = String(n).padStart(2, "0"); remaining -= n * unit; }
-    }
+  let list = [];
+  try {
+    const parsed = JSON.parse(s.syllabus_text || "");
+    if (parsed && parsed.v === 2 && Array.isArray(parsed.cts)) list = parsed.cts; else throw new Error("legacy");
+  } catch {
+    list = (s.ct_datetime || s.syllabus_title || s.syllabus_text) ? [{ title: s.syllabus_title || "", datetime: s.ct_datetime || "", syllabus: s.syllabus_text || "" }] : [];
   }
-  $("#syllabusTitle").textContent = s.syllabus_title || "Syllabus will appear here";
-  $("#syllabusText").textContent = s.syllabus_text || "The CR can publish the class test syllabus from the admin panel.";
+  return Array.from({ length: CT_SLOTS }, (_, i) => { const c = list[i] || {}; return { title: safeText(c.title), datetime: safeText(c.datetime), syllabus: safeText(c.syllabus) }; });
+}
+function buildCtSlider() {
+  const track = $("#ctSlider"), dots = $("#ctDots");
+  track.innerHTML = ""; dots.innerHTML = ""; ctRefs = []; ctDotEls = [];
+  for (let i = 0; i < CT_SLOTS; i++) {
+    const slide = el("article", "ct-slide");
+    slide.setAttribute("role", "group"); slide.setAttribute("aria-roledescription", "slide"); slide.setAttribute("aria-label", `CT ${i + 1} of ${CT_SLOTS}`);
+    const card = el("div", "ct-card");
+    const top = el("div", "ct-top"); const head = el("div");
+    const eyebrow = el("div", "eyebrow light", `CLASS TEST ${i + 1}`); const title = el("h2"); const meta = el("p");
+    head.append(eyebrow, title, meta);
+    const status = el("span", "pill"); top.append(head, status);
+    const countdown = el("div", "countdown"); const nums = {};
+    [["days", "Days"], ["hours", "Hours"], ["minutes", "Minutes"], ["seconds", "Seconds"]].forEach(([key, label]) => {
+      const box = el("div"); const num = el("strong", "", "--"); box.append(num, el("span", "", label)); countdown.append(box); nums[key] = num;
+    });
+    const syllabus = el("div", "syllabus"); const sHead = el("div", "syllabus-heading");
+    sHead.append(el("span", "mini-label", "SYLLABUS"), el("span", "syllabus-icon", "✓"));
+    const sText = el("div", "syllabus-text"); sText.tabIndex = 0;
+    syllabus.append(sHead, sText);
+    card.append(top, countdown, syllabus); slide.append(card); track.append(slide);
+    ctRefs.push({ title, meta, status, nums, sText });
+    const dot = el("button", "ct-dot"); dot.type = "button"; dot.setAttribute("aria-label", `Show CT ${i + 1}`);
+    dot.addEventListener("click", () => { goToCt(i, true); startCtAuto(); });
+    dots.append(dot); ctDotEls.push(dot);
+  }
+  updateCtDots();
+}
+function updateCtDots() { ctDotEls.forEach((d, i) => { d.classList.toggle("active", i === ctIndex); d.setAttribute("aria-current", i === ctIndex ? "true" : "false"); }); }
+function goToCt(i, smooth = true) {
+  const track = $("#ctSlider"); ctIndex = i; updateCtDots();
+  track.scrollTo({ left: i * track.clientWidth, behavior: smooth && !reduceMotion.matches ? "smooth" : "auto" });
+}
+function startCtAuto() {
+  clearInterval(ctAutoTimer);
+  if (reduceMotion.matches) return;
+  ctAutoTimer = setInterval(() => { if (ctHold === 0 && !document.hidden) goToCt((ctIndex + 1) % CT_SLOTS); }, CT_AUTO_MS);
+}
+function initCtSlider() {
+  buildCtSlider();
+  const track = $("#ctSlider"), wrap = $("#ctWrap");
+  track.addEventListener("scroll", () => {
+    clearTimeout(ctScrollTimer);
+    ctScrollTimer = setTimeout(() => { ctIndex = Math.round(track.scrollLeft / track.clientWidth) || 0; updateCtDots(); }, 80);
+  }, { passive: true });
+  const hold = () => { ctHold++; }, release = () => { ctHold = Math.max(0, ctHold - 1); };
+  wrap.addEventListener("mouseenter", hold); wrap.addEventListener("mouseleave", release);
+  wrap.addEventListener("focusin", hold); wrap.addEventListener("focusout", release);
+  wrap.addEventListener("touchstart", () => { clearInterval(ctAutoTimer); }, { passive: true });
+  wrap.addEventListener("touchend", () => { startCtAuto(); }, { passive: true });
+  window.addEventListener("resize", () => goToCt(ctIndex, false));
+  reduceMotion.addEventListener("change", startCtAuto);
+  startCtAuto();
+}
+function renderCountdown() {
+  $("#monthLabel").textContent = currentMonthLabel();
+  const cts = getCts();
+  cts.forEach((ct, i) => {
+    const r = ctRefs[i]; if (!r) return;
+    r.title.textContent = ct.title || `CT ${i + 1}`;
+    r.meta.textContent = ct.datetime ? "Scheduled for " + prettyDate(ct.datetime, true) + " (Bangladesh time)" : "The CR has not scheduled this CT yet.";
+    r.sText.textContent = ct.syllabus || "Syllabus will appear here.";
+  });
+  tickCountdown();
+}
+function tickCountdown() {
+  const cts = getCts();
+  cts.forEach((ct, i) => {
+    const r = ctRefs[i]; if (!r) return;
+    const setAll = (v) => ["days", "hours", "minutes", "seconds"].forEach(k => r.nums[k].textContent = v);
+    const target = ct.datetime ? new Date(ct.datetime).getTime() : NaN;
+    if (Number.isNaN(target)) { r.status.textContent = "SCHEDULE TBD"; setAll("--"); return; }
+    const diff = target - Date.now();
+    if (diff <= 0) { r.status.textContent = "TIME REACHED"; setAll("00"); return; }
+    r.status.textContent = "COUNTING DOWN";
+    const units = { days: 86400000, hours: 3600000, minutes: 60000, seconds: 1000 };
+    let remaining = diff;
+    for (const [key, unit] of Object.entries(units)) { const n = Math.floor(remaining / unit); r.nums[key].textContent = String(n).padStart(2, "0"); remaining -= n * unit; }
+  });
 }
 function renderNotices() {
   const list = $("#noticeList");
@@ -95,14 +167,27 @@ async function loadData() {
     showToast(error.message);
   }
 }
+function buildCtFields() {
+  const box = $("#ctFields"); box.innerHTML = "";
+  for (let i = 0; i < CT_SLOTS; i++) {
+    const d = document.createElement("details"); d.className = "ct-fieldset"; if (i === 0) d.open = true;
+    d.innerHTML = `<summary>CT ${i + 1}</summary>
+      <label for="ctTitle${i}">CT title</label><input id="ctTitle${i}" maxlength="80" placeholder="e.g. CT-2 · Discrete Mathematics">
+      <label for="ctDate${i}">Date & time</label><input id="ctDate${i}" type="datetime-local">
+      <label for="ctSyllabus${i}">Syllabus</label><textarea id="ctSyllabus${i}" rows="5" maxlength="${CT_SYLLABUS_MAX}" placeholder="Write chapters, topics or instructions. New lines are preserved."></textarea>`;
+    box.append(d);
+  }
+}
 function fillCtForm() {
-  const s = appState.settings || {};
-  if (s.ct_datetime) {
-    const d = new Date(s.ct_datetime);
-    const parts = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Dhaka", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d).replace(" ", "T");
-    $("#ctDate").value = parts;
-  } else $("#ctDate").value = "";
-  $("#ctSyllabusTitle").value = s.syllabus_title || ""; $("#ctSyllabus").value = s.syllabus_text || "";
+  getCts().forEach((c, i) => {
+    let local = "";
+    if (c.datetime) {
+      const d = new Date(c.datetime);
+      if (!Number.isNaN(d.getTime())) local = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Dhaka", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d).replace(" ", "T");
+    }
+    $("#ctTitle" + i).value = c.title; $("#ctDate" + i).value = local; $("#ctSyllabus" + i).value = c.syllabus;
+  });
+  $$("#ctFields details").forEach((d, i) => { const t = $("#ctTitle" + i).value.trim(); d.querySelector("summary").textContent = `CT ${i + 1}` + (t ? " — " + t : ""); });
 }
 function resetNoticeForm() {
   appState.editingId = null; $("#noticeForm").reset(); $("#editingId").value = ""; $("#cancelEdit").classList.add("hidden"); $("#noticeForm button[type=submit]").textContent = "Publish notice"; $("#noticeFormMessage").textContent = "";
@@ -146,10 +231,21 @@ $("#noticeForm").addEventListener("submit", async event => {
 $("#cancelEdit").addEventListener("click", resetNoticeForm);
 $("#ctForm").addEventListener("submit", async event => {
   event.preventDefault(); const button = $("#ctForm button[type=submit]"); button.disabled = true;
-  const payload = { ct_datetime: $("#ctDate").value, syllabus_title: $("#ctSyllabusTitle").value, syllabus_text: $("#ctSyllabus").value };
-  try { await api("/api/settings", { method: "PUT", body: JSON.stringify(payload) }); $("#ctFormMessage").textContent = "CT schedule and syllabus saved."; await loadData(); showToast("CT details updated."); }
-  catch (error) { $("#ctFormMessage").textContent = error.message; }
+  try {
+    const raw = [];
+    const cts = Array.from({ length: CT_SLOTS }, (_, i) => {
+      const v = $("#ctDate" + i).value; raw.push(v);
+      return { title: $("#ctTitle" + i).value.trim(), datetime: v ? new Date(v + ":00+06:00").toISOString() : "", syllabus: $("#ctSyllabus" + i).value.trim() };
+    });
+    const json = JSON.stringify({ v: 2, cts });
+    if (json.length > 7800) throw new Error("Too much text in the CT cards. Shorten some syllabus text and save again.");
+    const payload = { ct_datetime: raw.find(Boolean) || "", syllabus_title: cts[0].title, syllabus_text: json };
+    await api("/api/settings", { method: "PUT", body: JSON.stringify(payload) });
+    $("#ctFormMessage").textContent = "CT cards saved."; await loadData(); showToast("CT cards updated.");
+  } catch (error) { $("#ctFormMessage").textContent = error.message; }
   finally { button.disabled = false; }
 });
-setInterval(() => renderCountdown(), 1000);
+buildCtFields();
+initCtSlider();
+setInterval(() => tickCountdown(), 1000);
 loadData();
