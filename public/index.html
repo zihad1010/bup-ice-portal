@@ -49,5 +49,17 @@
   </div></div>
   <div id="toast" class="toast" role="status"></div>
 <script src="./app.js" defer></script>
+  <script>
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", async () => {
+        try {
+            await navigator.serviceWorker.register("/sw.js");
+            console.log("BUP ICE PWA Registered!");
+        } catch (error) {
+            console.error("PWA Registration Failed:", error);
+        }
+    });
+}
+</script>
 </body>
 </html>
