@@ -375,13 +375,8 @@ function calEvents() {
   };
   const st = readStore();
   st.up.forEach(r => add(r.date, "CT", r.course, r.ct));
-  st.cts.forEach((c, i) => {
-    if (!c.datetime) return;
-    const t = new Date(c.datetime); if (Number.isNaN(t.getTime())) return;
-    add(dhakaKey(t), "CT", c.title || `CT ${i + 1}`, new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Dhaka", hour: "2-digit", minute: "2-digit" }).format(t));
-  });
   st.ex.items.forEach(r => add(r.date, "Exam", r.course, [st.ex.title, r.time].filter(Boolean).join(" · ")));
-  const noticeType = { "Assignment": "Assignment", "Quiz / CT": "CT / Quiz", "Exam": "Exam" };
+  const noticeType = { "Assignment": "Assignment" };
   (appState.notices || []).forEach(n => { const type = noticeType[n.category]; if (type && n.relevant_date) add(String(n.relevant_date).slice(0, 10), type, n.title, ""); });
   return map;
 }
@@ -453,7 +448,7 @@ $("#upForm").addEventListener("submit", async event => {
 $("#exForm").addEventListener("submit", async event => {
   event.preventDefault(); const btn = $("#exForm button[type=submit]"), msg = $("#exFormMessage"); btn.disabled = true; setMsg(msg, "", false);
   try {
-    const title = $("#exMainTitle").value.trim(), items = [];
+    const title = $("#exMainTitle").value.trim() || readStore().ex.title, items = [];
     $$("#exRows .ex-item").forEach((d, i) => {
       const v = (c) => d.querySelector(c).value.trim();
       const item = { date: d.querySelector(".ex-date").value, course: v(".ex-course"), time: v(".ex-time"), syllabus: v(".ex-syl") };
@@ -461,7 +456,6 @@ $("#exForm").addEventListener("submit", async event => {
       if (!item.date || !item.course) throw new Error(`Entry ${i + 1}: date and course name are required.`);
       items.push(item);
     });
-    if (items.length && !title) throw new Error("Please write the exam title first.");
     await saveStore({ ex: { title, items } });
     await loadData(); setMsg(msg, "Exam routine saved.", false); showToast("Exam routine updated.");
   } catch (error) { setMsg(msg, error.message, true); }
