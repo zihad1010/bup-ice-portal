@@ -89,7 +89,6 @@ function initCtSlider() {
   startCtAuto();
 }
 function renderCountdown() {
-  $("#monthLabel").textContent = currentMonthLabel();
   const cts = getCts();
   cts.forEach((ct, i) => {
     const r = ctRefs[i]; if (!r) return;
@@ -117,7 +116,6 @@ function tickCountdown() {
 function renderNotices() {
   const list = $("#noticeList");
   const filtered = appState.notices.filter(n => appState.filter === "all" || n.category === appState.filter);
-  $("#noticeCount").textContent = `${appState.notices.length} update${appState.notices.length === 1 ? "" : "s"}`;
   list.innerHTML = "";
   $("#emptyState").classList.toggle("hidden", filtered.length > 0);
   list.classList.toggle("hidden", filtered.length === 0);
@@ -159,8 +157,8 @@ async function loadData() {
   try {
     const data = await api("/api/bootstrap");
     appState.notices = data.notices || []; appState.settings = data.settings || {}; appState.isAdmin = Boolean(data.isAdmin);
-    renderCountdown(); renderNotices();
-    if (appState.isAdmin) { renderAdminNotices(); fillCtForm(); }
+    renderCountdown(); renderNotices(); renderInfoPanels();
+    if (appState.isAdmin) { renderAdminNotices(); fillCtForm(); fillStoreForms(); }
   } catch (error) {
     $("#noticeList").innerHTML = "";
     const box = document.createElement("div"); box.className = "loading-card"; box.textContent = "Could not load updates. Please refresh in a moment."; $("#noticeList").append(box);
@@ -200,7 +198,7 @@ async function deleteNotice(id) {
   try { await api(`/api/notices/${id}`, { method: "DELETE" }); showToast("Notice deleted."); await loadData(); }
   catch (error) { showToast(error.message); }
 }
-function showAdmin() { $("#loginModal").classList.add("hidden"); showModal("adminModal"); renderAdminNotices(); fillCtForm(); }
+function showAdmin() { $("#loginModal").classList.add("hidden"); showModal("adminModal"); renderAdminNotices(); fillCtForm(); fillStoreForms(); }
 $("#adminOpen").addEventListener("click", () => appState.isAdmin ? showAdmin() : showModal("loginModal"));
 $$("[data-close]").forEach(el => el.addEventListener("click", () => closeModal(el.dataset.close)));
 $$(".filter").forEach(btn => btn.addEventListener("click", () => { $$(".filter").forEach(b => b.classList.remove("active")); btn.classList.add("active"); appState.filter = btn.dataset.filter; renderNotices(); }));
@@ -237,7 +235,7 @@ $("#ctForm").addEventListener("submit", async event => {
       const v = $("#ctDate" + i).value; raw.push(v);
       return { title: $("#ctTitle" + i).value.trim(), datetime: v ? new Date(v + ":00+06:00").toISOString() : "", syllabus: $("#ctSyllabus" + i).value.trim() };
     });
-    const json = JSON.stringify({ v: 2, cts });
+    const st = readStore(); const json = packStore({ cts, up: st.up, ex: st.ex });
     if (json.length > 7800) throw new Error("Too much text in the CT cards. Shorten some syllabus text and save again.");
     const payload = { ct_datetime: raw.find(Boolean) || "", syllabus_title: cts[0].title, syllabus_text: json };
     await api("/api/settings", { method: "PUT", body: JSON.stringify(payload) });
@@ -245,6 +243,157 @@ $("#ctForm").addEventListener("submit", async event => {
   } catch (error) { $("#ctFormMessage").textContent = error.message; }
   finally { button.disabled = false; }
 });
+/* ---------- Upcoming CT, Exam routine and the 4 pills ---------- */
+const STORE_LIMIT = 7800;
+let exSeq = 0;
+function readStore() {
+  let p = null;
+  try { p = JSON.parse((appState.settings || {}).syllabus_text || ""); } catch {}
+  const ok = p && p.v === 2;
+  const up = ok && Array.isArray(p.up) ? p.up : [], ex = ok && Array.isArray(p.ex) ? p.ex : [];
+  return {
+    cts: getCts(),
+    up: up.map(r => ({ course: safeText(r.c), ct: safeText(r.n), date: safeText(r.d) })),
+    ex: ex.map(r => ({ title: safeText(r.t), date: safeText(r.d), course: safeText(r.c), time: safeText(r.m), syllabus: safeText(r.s) }))
+  };
+}
+function packStore(st) {
+  return JSON.stringify({
+    v: 2, cts: st.cts,
+    up: st.up.map(r => ({ c: r.course, n: r.ct, d: r.date })),
+    ex: st.ex.map(r => ({ t: r.title, d: r.date, c: r.course, m: r.time, s: r.syllabus }))
+  });
+}
+async function saveStore(patch) {
+  const s = appState.settings || {}, cur = readStore();
+  const json = packStore({ cts: cur.cts, up: cur.up, ex: cur.ex, ...patch });
+  if (json.length > STORE_LIMIT) throw new Error(`Too much saved text (${json.length}/${STORE_LIMIT}). Shorten some entries or CT syllabus text and save again.`);
+  await api("/api/settings", { method: "PUT", body: JSON.stringify({ ct_datetime: s.ct_datetime || "", syllabus_title: s.syllabus_title || "", syllabus_text: json }) });
+}
+function dhakaToday() { return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Dhaka", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()); }
+function daysLeft(dateStr) { const t = Date.parse(dateStr + "T00:00:00Z"), n = Date.parse(dhakaToday() + "T00:00:00Z"); return Number.isNaN(t) ? null : Math.round((t - n) / 86400000); }
+function leftLabel(d) { if (d === null) return "—"; if (d < 0) return "Passed"; if (d === 0) return "Today"; if (d === 1) return "Tomorrow"; return d + " days left"; }
+function isPast(d) { return d === null || d < 0; }
+function withDays(list) {
+  return list.map(r => ({ ...r, d: daysLeft(r.date) })).sort((a, b) => {
+    const ap = isPast(a.d), bp = isPast(b.d);
+    if (ap !== bp) return ap ? 1 : -1;
+    return ap ? (b.d ?? -1e9) - (a.d ?? -1e9) : a.d - b.d;
+  });
+}
+function renderUpcoming() {
+  const box = $("#upBody"); box.innerHTML = "";
+  const rows = withDays(readStore().up);
+  if (!rows.length) { box.append(el("div", "info-empty", "No upcoming CT has been added yet.")); return; }
+  const wrap = el("div", "table-wrap"), table = el("table", "info-table"), thead = el("thead"), hr = el("tr");
+  ["Course", "CT", "Date", "Remaining"].forEach(h => { const th = el("th", "", h); th.scope = "col"; hr.append(th); });
+  thead.append(hr);
+  const tbody = el("tbody");
+  rows.forEach(r => {
+    const tr = el("tr", isPast(r.d) ? "is-past" : "");
+    const badge = el("span", "left-badge" + (isPast(r.d) ? " past" : r.d <= 3 ? " soon" : ""), leftLabel(r.d));
+    const last = el("td"); last.append(badge);
+    tr.append(el("td", "c-course", r.course), el("td", "", r.ct || "—"), el("td", "c-date", prettyDate(r.date)), last);
+    tbody.append(tr);
+  });
+  table.append(thead, tbody); wrap.append(table); box.append(wrap);
+}
+function renderExams() {
+  const box = $("#exBody"); box.innerHTML = "";
+  const rows = withDays(readStore().ex);
+  if (!rows.length) { box.append(el("div", "info-empty", "No exam routine has been added yet.")); return; }
+  const field = (label, val, cls) => { const f = el("div", "exam-field" + (cls ? " " + cls : "")); f.append(el("span", "", label), el("div", "v", val)); return f; };
+  const list = el("div", "exam-list");
+  rows.forEach(r => {
+    const card = el("article", "exam-card" + (isPast(r.d) ? " is-past" : ""));
+    card.append(el("h3", "exam-title", r.title), el("div", "exam-date", prettyDate(r.date)), field("Course", r.course || "—"), field("Exam time", r.time || "—"), field("Syllabus", r.syllabus || "—", "exam-syllabus"));
+    list.append(card);
+  });
+  box.append(list);
+}
+function renderInfoPanels() {
+  const st = readStore();
+  const live = (arr) => arr.filter(r => !isPast(daysLeft(r.date))).length;
+  const u = live(st.up), x = live(st.ex);
+  $("#upCount").textContent = u ? `${u} upcoming` : "Course, CT & date";
+  $("#exCount").textContent = x ? `${x} scheduled` : "Dates & syllabus";
+  renderUpcoming(); renderExams();
+}
+function setMsg(node, text, isError) { node.textContent = text; node.style.color = isError ? "var(--err)" : ""; }
+
+function addUpRow(r = {}) {
+  const row = el("div", "up-row");
+  const course = el("input", "up-course"); course.maxLength = 60; course.placeholder = "Course name"; course.setAttribute("aria-label", "Course name"); course.value = r.course || "";
+  const ct = el("input", "up-ct"); ct.maxLength = 12; ct.placeholder = "CT-1"; ct.setAttribute("aria-label", "CT number"); ct.value = r.ct || "";
+  const date = el("input", "up-date"); date.type = "date"; date.setAttribute("aria-label", "CT date"); date.value = r.date || "";
+  const rm = el("button", "mini-button danger", "Remove"); rm.type = "button"; rm.addEventListener("click", () => row.remove());
+  row.append(course, ct, date, rm); $("#upRows").append(row);
+  return row;
+}
+function addExItem(r = {}, open = true) {
+  const id = ++exSeq;
+  const d = el("details", "ct-fieldset ex-item"); d.open = open;
+  d.innerHTML = `<summary></summary>
+    <label for="exTitle${id}">Exam title</label><input id="exTitle${id}" class="ex-title" maxlength="80" placeholder="e.g. Mid Term Examination">
+    <div class="form-row"><div><label for="exDate${id}">Date</label><input id="exDate${id}" class="ex-date" type="date"></div><div><label for="exTime${id}">Exam time</label><input id="exTime${id}" class="ex-time" maxlength="40" placeholder="e.g. 10:00 AM – 12:00 PM"></div></div>
+    <label for="exCourse${id}">Course name</label><input id="exCourse${id}" class="ex-course" maxlength="60" placeholder="e.g. Discrete Mathematics">
+    <label for="exSyl${id}">Syllabus</label><textarea id="exSyl${id}" class="ex-syl" rows="4" maxlength="500" placeholder="Chapters or topics. New lines are preserved."></textarea>
+    <div class="ex-actions"><button type="button" class="mini-button danger">Remove this exam</button></div>`;
+  const q = (c) => d.querySelector(c), sum = q("summary");
+  q(".ex-title").value = r.title || ""; q(".ex-date").value = r.date || ""; q(".ex-time").value = r.time || ""; q(".ex-course").value = r.course || ""; q(".ex-syl").value = r.syllabus || "";
+  const upd = () => { const t = q(".ex-title").value.trim(), dt = q(".ex-date").value; sum.textContent = (t || "New exam") + (dt ? " — " + prettyDate(dt) : ""); };
+  d.addEventListener("input", upd); upd();
+  q(".ex-actions button").addEventListener("click", () => d.remove());
+  $("#exRows").append(d);
+  return d;
+}
+function fillStoreForms() {
+  const st = readStore();
+  $("#upRows").innerHTML = ""; (st.up.length ? st.up : [{}]).forEach(r => addUpRow(r));
+  $("#exRows").innerHTML = ""; st.ex.forEach(r => addExItem(r, false)); if (!st.ex.length) addExItem({}, true);
+}
+$$("[data-open]").forEach(btn => btn.addEventListener("click", () => {
+  const id = btn.dataset.open;
+  if (id === "upModal") renderUpcoming();
+  if (id === "exModal") renderExams();
+  showModal(id);
+  const close = $("#" + id + " .modal-close"); if (close) close.focus();
+}));
+$("#soonPill").addEventListener("click", () => showToast("Coming soon."));
+$("#upAdd").addEventListener("click", () => addUpRow().querySelector(".up-course").focus());
+$("#exAdd").addEventListener("click", () => { const d = addExItem({}, true); d.querySelector(".ex-title").focus(); });
+$("#upForm").addEventListener("submit", async event => {
+  event.preventDefault(); const btn = $("#upForm button[type=submit]"), msg = $("#upFormMessage"); btn.disabled = true; setMsg(msg, "", false);
+  try {
+    const up = [];
+    $$("#upRows .up-row").forEach((row, i) => {
+      const course = row.querySelector(".up-course").value.trim(), ct = row.querySelector(".up-ct").value.trim(), date = row.querySelector(".up-date").value;
+      if (!course && !ct && !date) return;
+      if (!course || !date) throw new Error(`Row ${i + 1}: course name and date are required.`);
+      up.push({ course, ct, date });
+    });
+    await saveStore({ up });
+    await loadData(); setMsg(msg, "Upcoming CT list saved.", false); showToast("Upcoming CT updated.");
+  } catch (error) { setMsg(msg, error.message, true); }
+  finally { btn.disabled = false; }
+});
+$("#exForm").addEventListener("submit", async event => {
+  event.preventDefault(); const btn = $("#exForm button[type=submit]"), msg = $("#exFormMessage"); btn.disabled = true; setMsg(msg, "", false);
+  try {
+    const ex = [];
+    $$("#exRows .ex-item").forEach((d, i) => {
+      const v = (c) => d.querySelector(c).value.trim();
+      const item = { title: v(".ex-title"), date: d.querySelector(".ex-date").value, course: v(".ex-course"), time: v(".ex-time"), syllabus: v(".ex-syl") };
+      if (!item.title && !item.date && !item.course && !item.time && !item.syllabus) return;
+      if (!item.title || !item.date) throw new Error(`Exam ${i + 1}: title and date are required.`);
+      ex.push(item);
+    });
+    await saveStore({ ex });
+    await loadData(); setMsg(msg, "Exam routine saved.", false); showToast("Exam routine updated.");
+  } catch (error) { setMsg(msg, error.message, true); }
+  finally { btn.disabled = false; }
+});
+
 buildCtFields();
 initCtSlider();
 setInterval(() => tickCountdown(), 1000);
