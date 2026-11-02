@@ -250,18 +250,22 @@ function readStore() {
   let p = null;
   try { p = JSON.parse((appState.settings || {}).syllabus_text || ""); } catch {}
   const ok = p && p.v === 2;
-  const up = ok && Array.isArray(p.up) ? p.up : [], ex = ok && Array.isArray(p.ex) ? p.ex : [];
+  const up = ok && Array.isArray(p.up) ? p.up : [];
+  const exRaw = ok ? p.ex : null;
+  let exTitle = "", exItems = [];
+  if (Array.isArray(exRaw)) { exTitle = safeText((exRaw[0] || {}).t); exItems = exRaw; }
+  else if (exRaw && typeof exRaw === "object") { exTitle = safeText(exRaw.t); exItems = Array.isArray(exRaw.i) ? exRaw.i : []; }
   return {
     cts: getCts(),
     up: up.map(r => ({ course: safeText(r.c), ct: safeText(r.n), date: safeText(r.d) })),
-    ex: ex.map(r => ({ title: safeText(r.t), date: safeText(r.d), course: safeText(r.c), time: safeText(r.m), syllabus: safeText(r.s) }))
+    ex: { title: exTitle, items: exItems.map(r => ({ date: safeText(r.d), course: safeText(r.c), time: safeText(r.m), syllabus: safeText(r.s) })) }
   };
 }
 function packStore(st) {
   return JSON.stringify({
     v: 2, cts: st.cts,
     up: st.up.map(r => ({ c: r.course, n: r.ct, d: r.date })),
-    ex: st.ex.map(r => ({ t: r.title, d: r.date, c: r.course, m: r.time, s: r.syllabus }))
+    ex: { t: st.ex.title, i: st.ex.items.map(r => ({ d: r.date, c: r.course, m: r.time, s: r.syllabus })) }
   });
 }
 async function saveStore(patch) {
@@ -300,13 +304,14 @@ function renderUpcoming() {
 }
 function renderExams() {
   const box = $("#exBody"); box.innerHTML = "";
-  const rows = withDays(readStore().ex);
-  if (!rows.length) { box.append(el("div", "info-empty", "No exam routine has been added yet.")); return; }
+  const ex = readStore().ex, rows = withDays(ex.items);
+  if (!ex.title && !rows.length) { box.append(el("div", "info-empty", "No exam routine has been added yet.")); return; }
+  if (ex.title) box.append(el("h3", "exam-heading", ex.title));
   const field = (label, val, cls) => { const f = el("div", "exam-field" + (cls ? " " + cls : "")); f.append(el("span", "", label), el("div", "v", val)); return f; };
   const list = el("div", "exam-list");
   rows.forEach(r => {
     const card = el("article", "exam-card" + (isPast(r.d) ? " is-past" : ""));
-    card.append(el("h3", "exam-title", r.title), el("div", "exam-date", prettyDate(r.date)), field("Course", r.course || "—"), field("Exam time", r.time || "—"), field("Syllabus", r.syllabus || "—", "exam-syllabus"));
+    card.append(el("div", "exam-date", prettyDate(r.date)), field("Course", r.course || "—"), field("Exam time", r.time || "—"), field("Syllabus", r.syllabus || "—", "exam-syllabus"));
     list.append(card);
   });
   box.append(list);
@@ -314,10 +319,10 @@ function renderExams() {
 function renderInfoPanels() {
   const st = readStore();
   const live = (arr) => arr.filter(r => !isPast(daysLeft(r.date))).length;
-  const u = live(st.up), x = live(st.ex);
+  const u = live(st.up), x = live(st.ex.items);
   $("#upCount").textContent = u ? `${u} upcoming` : "Course, CT & date";
   $("#exCount").textContent = x ? `${x} scheduled` : "Dates & syllabus";
-  renderUpcoming(); renderExams();
+  renderUpcoming(); renderExams(); renderCalendar();
 }
 function setMsg(node, text, isError) { node.textContent = text; node.style.color = isError ? "var(--err)" : ""; }
 
@@ -334,14 +339,14 @@ function addExItem(r = {}, open = true) {
   const id = ++exSeq;
   const d = el("details", "ct-fieldset ex-item"); d.open = open;
   d.innerHTML = `<summary></summary>
-    <label for="exTitle${id}">Exam title</label><input id="exTitle${id}" class="ex-title" maxlength="80" placeholder="e.g. Mid Term Examination">
-    <div class="form-row"><div><label for="exDate${id}">Date</label><input id="exDate${id}" class="ex-date" type="date"></div><div><label for="exTime${id}">Exam time</label><input id="exTime${id}" class="ex-time" maxlength="40" placeholder="e.g. 10:00 AM – 12:00 PM"></div></div>
+    <label for="exDate${id}">Date</label><input id="exDate${id}" class="ex-date" type="date">
     <label for="exCourse${id}">Course name</label><input id="exCourse${id}" class="ex-course" maxlength="60" placeholder="e.g. Discrete Mathematics">
+    <label for="exTime${id}">Exam time</label><input id="exTime${id}" class="ex-time" maxlength="40" placeholder="e.g. 10:00 AM – 12:00 PM">
     <label for="exSyl${id}">Syllabus</label><textarea id="exSyl${id}" class="ex-syl" rows="4" maxlength="500" placeholder="Chapters or topics. New lines are preserved."></textarea>
-    <div class="ex-actions"><button type="button" class="mini-button danger">Remove this exam</button></div>`;
+    <div class="ex-actions"><button type="button" class="mini-button danger">Remove this course</button></div>`;
   const q = (c) => d.querySelector(c), sum = q("summary");
-  q(".ex-title").value = r.title || ""; q(".ex-date").value = r.date || ""; q(".ex-time").value = r.time || ""; q(".ex-course").value = r.course || ""; q(".ex-syl").value = r.syllabus || "";
-  const upd = () => { const t = q(".ex-title").value.trim(), dt = q(".ex-date").value; sum.textContent = (t || "New exam") + (dt ? " — " + prettyDate(dt) : ""); };
+  q(".ex-date").value = r.date || ""; q(".ex-course").value = r.course || ""; q(".ex-time").value = r.time || ""; q(".ex-syl").value = r.syllabus || "";
+  const upd = () => { const c = q(".ex-course").value.trim(), dt = q(".ex-date").value; sum.textContent = (c || "New course") + (dt ? " — " + prettyDate(dt) : ""); };
   d.addEventListener("input", upd); upd();
   q(".ex-actions button").addEventListener("click", () => d.remove());
   $("#exRows").append(d);
@@ -350,18 +355,86 @@ function addExItem(r = {}, open = true) {
 function fillStoreForms() {
   const st = readStore();
   $("#upRows").innerHTML = ""; (st.up.length ? st.up : [{}]).forEach(r => addUpRow(r));
-  $("#exRows").innerHTML = ""; st.ex.forEach(r => addExItem(r, false)); if (!st.ex.length) addExItem({}, true);
+  $("#exMainTitle").value = st.ex.title;
+  $("#exRows").innerHTML = ""; st.ex.items.forEach(r => addExItem(r, false)); if (!st.ex.items.length) addExItem({}, true);
+}
+/* ---------- Unlucky Calendar: filled automatically from CT, exam and assignment dates ---------- */
+let calYear = null, calMonth = 0, calSelected = "";
+const CAL_FACE = '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M8.2 9.2v1.2M15.8 9.2v1.2"/><path d="M8.5 16.4c1-1.3 2.2-1.9 3.5-1.9s2.5.6 3.5 1.9"/><path d="M17 12.8c.6.9.9 1.4.9 1.9a.9.9 0 0 1-1.8 0c0-.5.3-1 .9-1.9z" fill="currentColor" stroke="none"/></svg>';
+const pad2 = (n) => String(n).padStart(2, "0");
+function dhakaKey(value) {
+  const d = new Date(value); if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Dhaka", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+}
+function calEvents() {
+  const map = {}, seen = new Set();
+  const add = (date, type, title, sub) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || "")) return;
+    const key = [date, type, title, sub].join("|").toLowerCase(); if (seen.has(key)) return; seen.add(key);
+    (map[date] = map[date] || []).push({ type, title: title || type, sub: sub || "" });
+  };
+  const st = readStore();
+  st.up.forEach(r => add(r.date, "CT", r.course, r.ct));
+  st.cts.forEach((c, i) => {
+    if (!c.datetime) return;
+    const t = new Date(c.datetime); if (Number.isNaN(t.getTime())) return;
+    add(dhakaKey(t), "CT", c.title || `CT ${i + 1}`, new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Dhaka", hour: "2-digit", minute: "2-digit" }).format(t));
+  });
+  st.ex.items.forEach(r => add(r.date, "Exam", r.course, [st.ex.title, r.time].filter(Boolean).join(" · ")));
+  const noticeType = { "Assignment": "Assignment", "Quiz / CT": "CT / Quiz", "Exam": "Exam" };
+  (appState.notices || []).forEach(n => { const type = noticeType[n.category]; if (type && n.relevant_date) add(String(n.relevant_date).slice(0, 10), type, n.title, ""); });
+  return map;
+}
+function openCalendar() { const t = dhakaToday().split("-"); calYear = +t[0]; calMonth = +t[1] - 1; calSelected = ""; renderCalendar(); }
+function shiftCalMonth(delta) { const d = new Date(Date.UTC(calYear, calMonth + delta, 1)); calYear = d.getUTCFullYear(); calMonth = d.getUTCMonth(); calSelected = ""; renderCalendar(); }
+function selectCalDay(key) { calSelected = calSelected === key ? "" : key; renderCalendar(); const b = $(`#calBody [data-key="${key}"]`); if (b) b.focus(); }
+function renderCalendar() {
+  if (calYear === null) { const t = dhakaToday().split("-"); calYear = +t[0]; calMonth = +t[1] - 1; }
+  const box = $("#calBody"); box.innerHTML = "";
+  const events = calEvents(), today = dhakaToday();
+  const nav = el("div", "cal-nav"), btns = el("div", "cal-nav-btns");
+  const mk = (label, aria, fn) => { const b = el("button", "mini-button", label); b.type = "button"; b.setAttribute("aria-label", aria); b.addEventListener("click", fn); return b; };
+  btns.append(mk("‹", "Previous month", () => shiftCalMonth(-1)), mk("Today", "Go to current month", openCalendar), mk("›", "Next month", () => shiftCalMonth(1)));
+  nav.append(el("strong", "", new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(calYear, calMonth, 1)))), btns);
+  const grid = el("div", "cal-grid");
+  ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].forEach(w => grid.append(el("div", "cal-wd", w)));
+  const first = new Date(Date.UTC(calYear, calMonth, 1)).getUTCDay(), days = new Date(Date.UTC(calYear, calMonth + 1, 0)).getUTCDate();
+  for (let i = 0; i < first; i++) { const b = el("div", "cal-day blank"); b.setAttribute("aria-hidden", "true"); grid.append(b); }
+  for (let d = 1; d <= days; d++) {
+    const key = `${calYear}-${pad2(calMonth + 1)}-${pad2(d)}`, list = events[key], isToday = key === today;
+    if (list) {
+      const b = el("button", "cal-day has-ev" + (isToday ? " today" : "") + (key === calSelected ? " selected" : ""));
+      b.type = "button"; b.dataset.key = key; b.setAttribute("aria-pressed", key === calSelected ? "true" : "false");
+      b.setAttribute("aria-label", `${prettyDate(key)}, ${list.length} item${list.length === 1 ? "" : "s"}`);
+      const emo = el("span", "emo"); emo.innerHTML = CAL_FACE; emo.setAttribute("aria-hidden", "true");
+      b.append(el("span", "num", String(d)), emo);
+      if (list.length > 1) b.append(el("span", "cnt", String(list.length)));
+      b.addEventListener("click", () => selectCalDay(key)); grid.append(b);
+    } else {
+      const c = el("div", "cal-day" + (isToday ? " today" : "")); c.append(el("span", "num", String(d))); grid.append(c);
+    }
+  }
+  const detail = el("div", "cal-detail"); detail.setAttribute("aria-live", "polite");
+  if (calSelected && events[calSelected]) {
+    detail.append(el("h3", "", prettyDate(calSelected)));
+    events[calSelected].forEach(e => {
+      const row = el("div", "cal-item"), txt = el("div"); txt.append(el("div", "t", e.title)); if (e.sub) txt.append(el("div", "s", e.sub));
+      row.append(el("span", "cal-type", e.type), txt); detail.append(row);
+    });
+  } else detail.append(el("div", "cal-hint", "Tap a marked date to see what is on that day."));
+  box.append(nav, grid, detail);
 }
 $$("[data-open]").forEach(btn => btn.addEventListener("click", () => {
   const id = btn.dataset.open;
   if (id === "upModal") renderUpcoming();
   if (id === "exModal") renderExams();
+  if (id === "calModal") openCalendar();
   showModal(id);
   const close = $("#" + id + " .modal-close"); if (close) close.focus();
 }));
 $("#soonPill").addEventListener("click", () => showToast("Coming soon."));
 $("#upAdd").addEventListener("click", () => addUpRow().querySelector(".up-course").focus());
-$("#exAdd").addEventListener("click", () => { const d = addExItem({}, true); d.querySelector(".ex-title").focus(); });
+$("#exAdd").addEventListener("click", () => { const d = addExItem({}, true); d.querySelector(".ex-date").focus(); });
 $("#upForm").addEventListener("submit", async event => {
   event.preventDefault(); const btn = $("#upForm button[type=submit]"), msg = $("#upFormMessage"); btn.disabled = true; setMsg(msg, "", false);
   try {
@@ -380,15 +453,16 @@ $("#upForm").addEventListener("submit", async event => {
 $("#exForm").addEventListener("submit", async event => {
   event.preventDefault(); const btn = $("#exForm button[type=submit]"), msg = $("#exFormMessage"); btn.disabled = true; setMsg(msg, "", false);
   try {
-    const ex = [];
+    const title = $("#exMainTitle").value.trim(), items = [];
     $$("#exRows .ex-item").forEach((d, i) => {
       const v = (c) => d.querySelector(c).value.trim();
-      const item = { title: v(".ex-title"), date: d.querySelector(".ex-date").value, course: v(".ex-course"), time: v(".ex-time"), syllabus: v(".ex-syl") };
-      if (!item.title && !item.date && !item.course && !item.time && !item.syllabus) return;
-      if (!item.title || !item.date) throw new Error(`Exam ${i + 1}: title and date are required.`);
-      ex.push(item);
+      const item = { date: d.querySelector(".ex-date").value, course: v(".ex-course"), time: v(".ex-time"), syllabus: v(".ex-syl") };
+      if (!item.date && !item.course && !item.time && !item.syllabus) return;
+      if (!item.date || !item.course) throw new Error(`Entry ${i + 1}: date and course name are required.`);
+      items.push(item);
     });
-    await saveStore({ ex });
+    if (items.length && !title) throw new Error("Please write the exam title first.");
+    await saveStore({ ex: { title, items } });
     await loadData(); setMsg(msg, "Exam routine saved.", false); showToast("Exam routine updated.");
   } catch (error) { setMsg(msg, error.message, true); }
   finally { btn.disabled = false; }
