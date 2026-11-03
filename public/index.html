@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f2ec">
+  <script>try{var t=localStorage.getItem("bupTheme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme="light"}</script>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="BUP ICE">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>BUP ICE | Class Updates</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-feed" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2zm0 0A2 2 0 0 0 6 21h13"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 17v-6a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-exam" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="3"/><path d="M9 4h6v3H9zM9 12h6M9 16h4"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l2 5.5L19.5 10 14 12l-2 5.5L10 12 4.5 10 10 8.5z"/></symbol>
+</defs></svg>
+<div class="app">
+  <header class="topbar">
+    <a class="brand" href="#home" aria-label="BUP ICE home"><span class="brand-mark"><img src="./icons/logo-white.png" alt=""></span><span><strong>BUP ICE</strong><small>Class update portal</small></span></a>
+    <div class="top-actions"><button id="themeToggle" class="icon-btn" aria-label="Switch light or dark mode"><svg class="ic" aria-hidden="true"><use href="#i-moon"/></svg></button><button id="notifOpen" class="icon-btn" aria-label="Notifications"><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg><span id="notifBadge" class="badge hidden">0</span></button></div>
+  </header>
+  <main>
+    <section id="view-home" class="view">
+      <h1 class="sr">Home</h1>
+      <section id="ctWrap" class="ct-wrap" aria-label="Class test countdowns" aria-roledescription="carousel"><div id="ctSlider" class="ct-slider"></div><div id="ctDots" class="ct-dots"></div></section>
+      <div class="quick">
+        <button type="button" class="stat" data-open="upModal" aria-haspopup="dialog"><span class="stat-icon"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg></span><span class="stat-text"><strong>Upcoming CT</strong><small id="upCount"></small></span></button>
+        <button type="button" class="stat" data-open="exModal" aria-haspopup="dialog"><span class="stat-icon"><svg class="ic" aria-hidden="true"><use href="#i-exam"/></svg></span><span class="stat-text"><strong>Exam Routine</strong><small id="exCount"></small></span></button>
+        <button type="button" class="stat" data-open="calModal" aria-haspopup="dialog"><span class="stat-icon"><svg class="ic" aria-hidden="true"><use href="#i-cal"/></svg></span><span class="stat-text"><strong>Unlucky Calendar</strong></span></button>
+        <button type="button" class="stat" id="soonPill" aria-disabled="true"><span class="stat-icon"><svg class="ic" aria-hidden="true"><use href="#i-spark"/></svg></span><span class="stat-text"><strong>Coming soon</strong></span></button>
+      </div>
+      <div class="sec-head"><h2>Pinned notices</h2></div>
+      <div id="pinnedList" class="notice-list"></div>
+      <div id="pinnedEmpty" class="empty-state hidden"><h3>Nothing pinned</h3><p>Important notices pinned by the CR will stay here.</p></div>
+    </section>
+    <section id="view-feed" class="view hidden">
+      <div class="sec-head"><div><h1 class="page-title">Notice feed</h1><p class="page-sub">Everything your CR has published.</p></div><button id="refreshBtn" class="button button-soft">Refresh</button></div>
+      <div class="filters"><button class="filter active" data-filter="all">All updates</button><button class="filter" data-filter="Class">Class</button><button class="filter" data-filter="Assignment">Assignment</button><button class="filter" data-filter="Quiz / CT">Quiz / CT</button><button class="filter" data-filter="Exam">Exam</button><button class="filter" data-filter="Other">Other</button></div>
+      <div id="noticeList" class="notice-list"><div class="loading-card">Loading class updates…</div></div>
+      <div id="emptyState" class="empty-state hidden"><h3>No updates yet</h3><p>New class notices will appear here when the CR publishes them.</p></div>
+    </section>
+    <section id="view-materials" class="view hidden">
+      <h1 class="page-title">Materials</h1>
+      <div class="soon-card"><span class="stat-icon"><svg class="ic" aria-hidden="true"><use href="#i-book"/></svg></span><h2>Coming soon</h2><p>Class notes, slides and links will be shared here.</p></div>
+    </section>
+    <section id="view-profile" class="view hidden">
+      <h1 class="page-title">Profile</h1>
+      <div class="profile-card"><div class="avatar"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg></div><h2 id="profileName">Guest</h2><p id="profileSub">You are not signed in.</p>
+        <div class="stack"><button id="userLogin" class="button button-outline" type="button">Login as User</button><button id="adminOpen" class="button button-primary" type="button">Login as Admin</button></div>
+        <div class="set-label" style="text-align:left">Appearance</div>
+        <div class="seg" role="group" aria-label="Theme"><button type="button" data-theme-set="light">Light</button><button type="button" data-theme-set="dark">Dark</button></div>
+        <p id="previewNote" class="preview-note hidden">Preview mode: no backend found, so sample data is saved in this browser only. Demo admin password: <strong>admin123</strong></p>
+      </div>
+    </section>
+  </main>
+</div>
+<nav class="bottom-nav" aria-label="Main"><button class="nav-btn active" data-view="home" aria-label="Home" title="Home"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg></button><button class="nav-btn" data-view="feed" aria-label="Notice Feed" title="Notice Feed"><svg class="ic" aria-hidden="true"><use href="#i-feed"/></svg></button><button class="nav-btn" data-view="materials" aria-label="Materials" title="Materials"><svg class="ic" aria-hidden="true"><use href="#i-book"/></svg></button><button class="nav-btn" data-view="profile" aria-label="Profile" title="Profile"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg></button></nav>
+
+<div id="loginModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><div class="modal-backdrop" data-close="loginModal"></div><div class="modal-card"><button class="modal-close" data-close="loginModal" aria-label="Close">×</button><div class="modal-icon">⌁</div><div class="eyebrow">Representative access</div><h2 id="loginTitle">CR login</h2><p>Sign in to publish class notices and update the CT syllabus.</p><form id="loginForm"><label for="adminPassword">Admin password</label><input id="adminPassword" type="password" autocomplete="current-password" required placeholder="Enter CR password"><button class="button button-primary full-width" type="submit">Login securely</button><div id="loginError" class="form-error" role="alert"></div></form><small class="muted">Only the authorized CR should use this panel.</small></div></div>
+
+  <div id="adminModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="adminTitle"><div class="modal-backdrop" data-close="adminModal"></div><div class="modal-card admin-card"><button class="modal-close" data-close="adminModal" aria-label="Close">×</button><div class="eyebrow">Manage class information</div><h2 id="adminTitle">CR Admin Panel</h2><p class="modal-intro">Changes are saved to the shared class website.</p>
+    <div class="admin-tabs"><button class="admin-tab active" data-tab="noticeEditor">Publish notice</button><button class="admin-tab" data-tab="ctEditor">CT & syllabus</button><button class="admin-tab" data-tab="upEditor">Upcoming CT</button><button class="admin-tab" data-tab="exEditor">Exam routine</button><button class="admin-tab" id="logoutBtn">Logout</button></div>
+    <section id="noticeEditor" class="admin-pane"><form id="noticeForm"><input id="editingId" type="hidden"><label for="noticeTitle">Notice title</label><input id="noticeTitle" maxlength="140" required placeholder="e.g. Structured Programming class rescheduled"><div class="form-row"><div><label for="noticeCategory">Category</label><select id="noticeCategory"><option>Class</option><option>Assignment</option><option>Quiz / CT</option><option>Exam</option><option>Other</option></select></div><div><label for="noticeDate">Relevant date (optional)</label><input id="noticeDate" type="date"></div></div><label for="noticeBody">Details</label><textarea id="noticeBody" rows="5" maxlength="6000" required placeholder="Write the update clearly…"></textarea><label class="checkbox-label"><input id="noticePinned" type="checkbox"> Pin this notice at the top</label><div class="form-row"><button id="cancelEdit" class="button button-soft hidden" type="button">Cancel edit</button><button class="button button-primary" type="submit">Publish notice</button></div><div id="noticeFormMessage" class="form-message" role="status"></div></form><div class="admin-existing"><h3>Manage published notices</h3><div id="adminNoticeList" class="admin-notice-list">Loading…</div></div></section>
+    <section id="ctEditor" class="admin-pane hidden"><form id="ctForm"><div id="ctFields"></div><small class="field-help">Use your local Bangladesh time. Each countdown card is based on its own date and time. Leave a CT empty to show it as "not scheduled".</small><button class="button button-primary full-width" type="submit">Save all CT cards</button><div id="ctFormMessage" class="form-message" role="status"></div></form><div class="notice-tip"><strong>Tip</strong><p>The 4 cards slide automatically on the public page. Update a CT title, date or syllabus any time and the countdown changes by itself.</p></div></section>
+    <section id="upEditor" class="admin-pane hidden"><form id="upForm"><div class="up-head" aria-hidden="true"><span>Course</span><span>CT no.</span><span>Date</span><span></span></div><div id="upRows"></div><button type="button" id="upAdd" class="button button-soft full-width">+ Add row</button><button class="button button-primary full-width" type="submit">Save upcoming CTs</button><div id="upFormMessage" class="form-message" role="status"></div></form><div class="notice-tip"><strong>Tip</strong><p>Add one row per class test. On the public card the CT with the fewest days left always stays on top, and passed CTs move to the bottom.</p></div></section>
+    <section id="exEditor" class="admin-pane hidden"><form id="exForm"><label for="exMainTitle">Exam title</label><input id="exMainTitle" maxlength="80" placeholder="e.g. Mid Term Examination"><small class="field-help">One title for the whole routine. Below it, add each course with its date.</small><div id="exRows"></div><button type="button" id="exAdd" class="button button-soft full-width">+ Add course</button><button class="button button-primary full-width" type="submit">Save exam routine</button><div id="exFormMessage" class="form-message" role="status"></div></form><div class="notice-tip"><strong>Tip</strong><p>Write the exam title once, then add one entry per course: date, course name, exam time and syllabus. Entries are shown by date, nearest first.</p></div></section>
+  </div></div>
+  <div id="upModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="upTitle"><div class="modal-backdrop" data-close="upModal"></div><div class="modal-card info-card"><button class="modal-close" data-close="upModal" aria-label="Close">×</button><div class="modal-icon">◷</div><div class="eyebrow">Class test</div><h2 id="upTitle">Upcoming CT</h2><p>Nearest class test first.</p><div id="upBody"></div></div></div>
+
+  <div id="exModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="exTitleHead"><div class="modal-backdrop" data-close="exModal"></div><div class="modal-card info-card"><button class="modal-close" data-close="exModal" aria-label="Close">×</button><div class="modal-icon">▤</div><div class="eyebrow">Examination</div><h2 id="exTitleHead">Exam Routine</h2><p>Exam dates, times and syllabus.</p><div id="exBody"></div></div></div>
+
+  <div id="calModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="calTitle"><div class="modal-backdrop" data-close="calModal"></div><div class="modal-card info-card"><button class="modal-close" data-close="calModal" aria-label="Close">×</button><div class="modal-icon">▦</div><h2 id="calTitle">Unlucky Calendar</h2><p>Dates with an exam, CT or assignment are marked.</p><div id="calBody"></div></div></div>
+
+  <div id="notifModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="notifTitle"><div class="modal-backdrop" data-close="notifModal"></div><div class="modal-card"><button class="modal-close" data-close="notifModal" aria-label="Close">×</button><h2 id="notifTitle">Notifications</h2><p>New updates from your CR.</p><div id="notifBody"></div><button id="alertBtn" class="button button-soft full-width" type="button">Turn on phone alerts</button></div></div>
+
+<div id="toast" class="toast" role="status"></div>
+<script src="./app.js" defer></script>
+</body>
+</html>
