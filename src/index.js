@@ -244,7 +244,7 @@ async function handleApi(request, env, url, ctx) {
       .bind(value.title, value.category, value.body, value.relevant_date, value.pinned)
       .run();
     ctx.waitUntil(
-      sendPushToAll(env, { title: "BUP ICE · " + value.category, body: value.title, url: "/#feed" })
+      sendPushToAll(env, { title: "My CR · " + value.category, body: value.title, url: "/#feed" })
     );
     return json({ ok: true, id: result.meta?.last_row_id }, 201);
   }
