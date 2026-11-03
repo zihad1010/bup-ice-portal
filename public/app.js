@@ -562,11 +562,33 @@ function openNotifs() {
   showModal("notifModal");
 }
 $("#notifOpen").addEventListener("click", openNotifs);
-$("#alertBtn").addEventListener("click", async () => {
-  if (!("Notification" in window)) return showToast("This browser does not support alerts.");
+function urlBase64ToUint8Array(b64) {
+  const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from([...raw].map((ch) => ch.charCodeAt(0)));
+}
+async function enablePush() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+    return showToast("Phone alerts are not supported here. On iPhone, add this site to the Home Screen first.");
+  }
   const p = await Notification.requestPermission();
-  showToast(p === "granted" ? "Alerts are on while the app is open." : "Alerts are blocked in browser settings.");
-});
+  if (p !== "granted") return showToast("Alerts are blocked in browser settings.");
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const { key } = await api("/api/push/key");
+    if (!key) return showToast("Push is not configured yet.");
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) });
+    await api("/api/push/subscribe", { method: "POST", body: JSON.stringify(sub) });
+    try { localStorage.setItem("bupPush", "1"); } catch {}
+    $("#alertBtn").textContent = "Phone alerts are on";
+    showToast("Phone alerts are on.");
+  } catch (err) {
+    showToast("Could not turn on alerts. Please try again.");
+  }
+}
+$("#alertBtn").addEventListener("click", enablePush);
+try { if (localStorage.getItem("bupPush") === "1" && Notification.permission === "granted") $("#alertBtn").textContent = "Phone alerts are on"; } catch {}
 setInterval(() => { if (!document.hidden) loadData(true); }, 60000);
 setTheme(document.documentElement.dataset.theme || "light");
 showView(location.hash.slice(1), false);
