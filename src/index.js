@@ -131,7 +131,7 @@ async function sendPushToAll(env, message) {
   const publicKey = await getSecret(env, "VAPID_PUBLIC_KEY");
   const privateKey = await getSecret(env, "VAPID_PRIVATE_KEY");
   const subject = (await getSecret(env, "VAPID_SUBJECT")) || "mailto:admin@example.com";
-  if (!publicKey || !privateKey) return;
+  if (!publicKey || !privateKey) { console.error("push skipped: VAPID keys missing", { hasPublic: !!publicKey, hasPrivate: !!privateKey }); return; }
   const vapid = { subject, publicKey, privateKey };
 
   const { results } = await env.DB.prepare(`SELECT endpoint, p256dh, auth FROM push_subscriptions`).all();
@@ -147,6 +147,8 @@ async function sendPushToAll(env, message) {
         const res = await fetch(subscription.endpoint, payload);
         if (res.status === 404 || res.status === 410) {
           await env.DB.prepare(`DELETE FROM push_subscriptions WHERE endpoint = ?`).bind(row.endpoint).run();
+        } else if (!res.ok) {
+          console.error("push rejected", res.status, (await res.text()).slice(0, 200));
         }
       } catch (err) {
         console.error("push failed", err);
@@ -193,6 +195,26 @@ async function handleApi(request, env, url, ctx) {
 
   if (path === "/api/push/key" && method === "GET") {
     return json({ key: await getSecret(env, "VAPID_PUBLIC_KEY") });
+  }
+
+  // CR only: quick health check for push (no secrets are shown)
+  if (path === "/api/push/status" && method === "GET") {
+    if (!(await isAdmin(request, env))) return json({ error: "Please log in as CR first." }, 401);
+    const pub = await getSecret(env, "VAPID_PUBLIC_KEY");
+    const priv = await getSecret(env, "VAPID_PRIVATE_KEY");
+    let subscriptions = null;
+    try {
+      subscriptions = (await env.DB.prepare(`SELECT COUNT(*) AS n FROM push_subscriptions`).first())?.n ?? 0;
+    } catch (e) {
+      subscriptions = "table missing or DB error";
+    }
+    return json({
+      subscriptions,
+      hasPublicKey: !!pub,
+      publicKeyLength: pub.length,
+      hasPrivateKey: !!priv,
+      privateKeyLength: priv.length,
+    });
   }
 
   if (path === "/api/push/subscribe" && method === "POST") {
