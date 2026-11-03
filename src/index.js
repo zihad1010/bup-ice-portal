@@ -1,6 +1,9 @@
 // BUP ICE Class Update Portal - Cloudflare Worker backend
 // Bindings needed: DB (D1), ASSETS (static files), secret ADMIN_PASSWORD
 // Optional secret: SESSION_SECRET (if not set, ADMIN_PASSWORD is used to sign sessions)
+// Push notifications: secrets VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (e.g. mailto:you@example.com)
+
+import { buildPushPayload } from "@block65/webcrypto-web-push";
 
 const CATEGORIES = ["Class", "Assignment", "Quiz / CT", "Exam", "Other"];
 const SESSION_SECONDS = 7 * 24 * 60 * 60; // 7 days
@@ -122,7 +125,37 @@ function parseCtDatetime(raw) {
   return { value: d.toISOString() };
 }
 
-async function handleApi(request, env, url) {
+
+// ---------- Web Push ----------
+async function sendPushToAll(env, message) {
+  const publicKey = await getSecret(env, "VAPID_PUBLIC_KEY");
+  const privateKey = await getSecret(env, "VAPID_PRIVATE_KEY");
+  const subject = (await getSecret(env, "VAPID_SUBJECT")) || "mailto:admin@example.com";
+  if (!publicKey || !privateKey) return;
+  const vapid = { subject, publicKey, privateKey };
+
+  const { results } = await env.DB.prepare(`SELECT endpoint, p256dh, auth FROM push_subscriptions`).all();
+  await Promise.all(
+    (results || []).map(async (row) => {
+      const subscription = { endpoint: row.endpoint, expirationTime: null, keys: { p256dh: row.p256dh, auth: row.auth } };
+      try {
+        const payload = await buildPushPayload(
+          { data: JSON.stringify(message), options: { ttl: 86400 } },
+          subscription,
+          vapid
+        );
+        const res = await fetch(subscription.endpoint, payload);
+        if (res.status === 404 || res.status === 410) {
+          await env.DB.prepare(`DELETE FROM push_subscriptions WHERE endpoint = ?`).bind(row.endpoint).run();
+        }
+      } catch (err) {
+        console.error("push failed", err);
+      }
+    })
+  );
+}
+
+async function handleApi(request, env, url, ctx) {
   const path = url.pathname.replace(/\/+$/, "");
   const method = request.method;
 
@@ -156,6 +189,24 @@ async function handleApi(request, env, url) {
       settings: settings || {},
       isAdmin: await isAdmin(request, env),
     });
+  }
+
+  if (path === "/api/push/key" && method === "GET") {
+    return json({ key: await getSecret(env, "VAPID_PUBLIC_KEY") });
+  }
+
+  if (path === "/api/push/subscribe" && method === "POST") {
+    const sub = await readBody(request);
+    const endpoint = String(sub?.endpoint ?? "");
+    const p256dh = String(sub?.keys?.p256dh ?? "");
+    const auth = String(sub?.keys?.auth ?? "");
+    if (!endpoint.startsWith("https://") || endpoint.length > 1000 || !p256dh || !auth) {
+      return json({ error: "Invalid subscription." }, 400);
+    }
+    await env.DB.prepare(
+      `INSERT OR REPLACE INTO push_subscriptions (endpoint, p256dh, auth) VALUES (?, ?, ?)`
+    ).bind(endpoint, p256dh, auth).run();
+    return json({ ok: true });
   }
 
   if (path === "/api/login" && method === "POST") {
@@ -192,6 +243,9 @@ async function handleApi(request, env, url) {
     )
       .bind(value.title, value.category, value.body, value.relevant_date, value.pinned)
       .run();
+    ctx.waitUntil(
+      sendPushToAll(env, { title: "BUP ICE · " + value.category, body: value.title, url: "/#feed" })
+    );
     return json({ ok: true, id: result.meta?.last_row_id }, 201);
   }
 
@@ -243,13 +297,13 @@ async function handleApi(request, env, url) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/") && url.pathname !== "/api") {
       return env.ASSETS.fetch(request);
     }
     try {
-      return await handleApi(request, env, url);
+      return await handleApi(request, env, url, ctx);
     } catch (err) {
       console.error(err);
       return json({ error: "Server error. Please try again." }, 500);
