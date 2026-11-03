@@ -13,5 +13,9 @@
       "database_name": "bup-ice-db",
       "database_id": "c7490754-00b5-4c63-8078-431f2518a32d"
     }
-  ]
+  ],
+  "vars": {
+    "VAPID_PUBLIC_KEY": "IVngQUgeig7nO8sMguoEHa3OKII2b5VYMbMV5m-PoMM",
+    "VAPID_SUBJECT": "mailto:mycrbup@gmail.com"
+  }
 }
