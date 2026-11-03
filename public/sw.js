@@ -41,13 +41,13 @@ self.addEventListener("fetch", (event) => {
 
 // ---------- Push notifications ----------
 self.addEventListener("push", (event) => {
-  let data = { title: "BUP ICE", body: "New update from your CR", url: "/" };
+  let data = { title: "My CR", body: "New update from your CR", url: "/" };
   try { data = { ...data, ...event.data.json() }; } catch (e) {}
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
       icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
+      badge: "/icons/badge-96.png",
       data: { url: data.url },
     })
   );
