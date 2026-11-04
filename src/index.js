@@ -217,6 +217,33 @@ async function handleApi(request, env, url, ctx) {
     });
   }
 
+  // CR only: send a test push and report what each push service answered
+  if (path === "/api/push/test" && method === "POST") {
+    if (!(await isAdmin(request, env))) return json({ error: "Please log in as CR first." }, 401);
+    const publicKey = await getSecret(env, "VAPID_PUBLIC_KEY");
+    const privateKey = await getSecret(env, "VAPID_PRIVATE_KEY");
+    const subject = (await getSecret(env, "VAPID_SUBJECT")) || "mailto:admin@example.com";
+    const vapid = { subject, publicKey, privateKey };
+    const { results } = await env.DB.prepare(`SELECT endpoint, p256dh, auth FROM push_subscriptions`).all();
+    const report = await Promise.all(
+      (results || []).map(async (row) => {
+        const host = new URL(row.endpoint).host;
+        try {
+          const payload = await buildPushPayload(
+            { data: JSON.stringify({ title: "My CR", body: "Test notification", url: "/" }), options: { ttl: 300 } },
+            { endpoint: row.endpoint, expirationTime: null, keys: { p256dh: row.p256dh, auth: row.auth } },
+            vapid
+          );
+          const res = await fetch(row.endpoint, payload);
+          return { host, status: res.status, reply: (await res.text()).slice(0, 200) };
+        } catch (err) {
+          return { host, error: String(err?.message || err) };
+        }
+      })
+    );
+    return json({ report });
+  }
+
   if (path === "/api/push/subscribe" && method === "POST") {
     const sub = await readBody(request);
     const endpoint = String(sub?.endpoint ?? "");
@@ -266,7 +293,7 @@ async function handleApi(request, env, url, ctx) {
       .bind(value.title, value.category, value.body, value.relevant_date, value.pinned)
       .run();
     ctx.waitUntil(
-      sendPushToAll(env, { title: "My CR · " + value.category, body: value.title, url: "/#feed" })
+      sendPushToAll(env, { title: "My CR · " + value.category, body: value.title, url: "/#notice-" + result.meta?.last_row_id })
     );
     return json({ ok: true, id: result.meta?.last_row_id }, 201);
   }
