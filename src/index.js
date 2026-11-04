@@ -140,7 +140,7 @@ async function sendPushToAll(env, message) {
       const subscription = { endpoint: row.endpoint, expirationTime: null, keys: { p256dh: row.p256dh, auth: row.auth } };
       try {
         const payload = await buildPushPayload(
-          { data: JSON.stringify(message), options: { ttl: 86400 } },
+          { data: JSON.stringify(message), options: { ttl: 86400, urgency: "high" } },
           subscription,
           vapid
         );
@@ -230,7 +230,7 @@ async function handleApi(request, env, url, ctx) {
         const host = new URL(row.endpoint).host;
         try {
           const payload = await buildPushPayload(
-            { data: JSON.stringify({ title: "My CR", body: "Test notification", url: "/" }), options: { ttl: 300 } },
+            { data: JSON.stringify({ title: "My CR", body: "Test notification", url: "/" }), options: { ttl: 300, urgency: "high" } },
             { endpoint: row.endpoint, expirationTime: null, keys: { p256dh: row.p256dh, auth: row.auth } },
             vapid
           );
