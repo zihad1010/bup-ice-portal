@@ -606,9 +606,23 @@ const pushSupported = () => "serviceWorker" in navigator && "PushManager" in win
 async function refreshPushBtn() {
   const b = $("#alertBtn"); if (!b) return false; let on = false;
   try { if (pushSupported() && Notification.permission === "granted") { const reg = await navigator.serviceWorker.ready; on = !!(await reg.pushManager.getSubscription()); } } catch {}
-  b.textContent = on ? "Phone alerts are on ✓" : "Turn on phone alerts";
+  b.textContent = on ? "Turn off phone alerts" : "Turn on phone alerts";
   b.classList.toggle("button-primary", !on); b.classList.toggle("button-soft", on);
   return on;
+}
+const pushOff = () => { try { return localStorage.getItem("bupPushOff") === "1"; } catch { return false; } };
+async function disablePush() {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      const endpoint = sub.endpoint;
+      try { await api("/api/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint }) }); } catch {}
+      await sub.unsubscribe();
+    }
+    try { localStorage.setItem("bupPushOff", "1"); } catch {}
+    await refreshPushBtn(); showToast("Phone alerts are off.");
+  } catch (err) { showToast("Could not turn off alerts. Please try again."); }
 }
 async function enablePush(silent = false) {
   if (!pushSupported()) { if (!silent) showToast("Phone alerts are not supported here. On iPhone, add this site to the Home Screen first."); return false; }
@@ -618,14 +632,22 @@ async function enablePush(silent = false) {
     const reg = await navigator.serviceWorker.ready;
     const { key } = await api("/api/push/key");
     if (!key) { if (!silent) showToast("Push is not configured yet."); return false; }
+    const appKey = urlBase64ToUint8Array(key);
     let sub = await reg.pushManager.getSubscription();
-    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) });
+    // If this phone subscribed with an old/different key, drop it and subscribe again with the current key
+    if (sub && sub.options && sub.options.applicationServerKey) {
+      const cur = new Uint8Array(sub.options.applicationServerKey);
+      const same = cur.length === appKey.length && cur.every((v, i) => v === appKey[i]);
+      if (!same) { try { await sub.unsubscribe(); } catch {} sub = null; }
+    }
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: appKey });
     await api("/api/push/subscribe", { method: "POST", body: JSON.stringify(sub) });
+    try { localStorage.removeItem("bupPushOff"); } catch {}
     await refreshPushBtn(); if (!silent) showToast("Phone alerts are on.");
     return true;
   } catch (err) { if (!silent) showToast("Could not turn on alerts. Please try again."); return false; }
 }
-$("#alertBtn")?.addEventListener("click", () => enablePush());
+$("#alertBtn")?.addEventListener("click", async () => { if (await refreshPushBtn()) disablePush(); else enablePush(); });
 $("#pushTestBtn")?.addEventListener("click", async () => {
   const msg = $("#pushTestMsg"); msg.textContent = "Sending…";
   try {
@@ -639,12 +661,11 @@ $("#pushAllow")?.addEventListener("click", async () => { if (await enablePush())
 async function firstVisitPrompt() {
   if (!pushSupported()) return;
   if (Notification.permission === "granted") {
-    try { const reg = await navigator.serviceWorker.ready; if (!(await reg.pushManager.getSubscription())) enablePush(true); } catch {}
+    if (!pushOff()) enablePush(true);
     return;
   }
   if (Notification.permission !== "default") return;
-  try { if (localStorage.getItem("bupAsked") === "1") return; localStorage.setItem("bupAsked", "1"); } catch {}
-  setTimeout(() => showModal("pushModal"), 1200);
+  setTimeout(() => showModal("pushModal"), 600);
 }
 setInterval(() => { if (!document.hidden) loadData(true); }, 60000);
 setTheme(document.documentElement.dataset.theme || "light");
