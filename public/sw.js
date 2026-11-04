@@ -1,4 +1,4 @@
-const CACHE = "bup-ice-v3";
+const CACHE = "bup-ice-v4";
 const SHELL = ["/", "/index.html", "/styles.css", "/app.js", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/logo-white.png"];
 
 self.addEventListener("install", (event) => {
@@ -48,6 +48,8 @@ self.addEventListener("push", (event) => {
       body: data.body,
       icon: "/icons/icon-192.png",
       badge: "/icons/badge-96.png",
+      tag: "mycr-" + Date.now(),
+      vibrate: [200, 100, 200],
       data: { url: data.url },
     })
   );
