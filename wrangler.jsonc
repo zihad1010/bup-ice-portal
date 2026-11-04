@@ -15,7 +15,7 @@
     }
   ],
   "vars": {
-    "VAPID_PUBLIC_KEY": "BA3QW3PYB1iIyOjD6k8c97atHFj0vLkIdwYG5b7sktw0tCVPmZ3p1Be3f2CtemXyYK_3wPxNIygOsFeU8GfX7vM",
+    "VAPID_PUBLIC_KEY": "BMlKtmwNPZRgKJJMZw-toDZO5SF6TcQnUjvEBnviZUvL3P2lo60HMSe1buSl1PUUfNB8Pzii1sYWr11nzjZZoOE",
     "VAPID_SUBJECT": "mailto:mycrbup@gmail.com"
   }
 }
