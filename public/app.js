@@ -602,28 +602,50 @@ function urlBase64ToUint8Array(b64) {
   const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
   return Uint8Array.from([...raw].map((ch) => ch.charCodeAt(0)));
 }
-async function enablePush() {
-  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
-    return showToast("Phone alerts are not supported here. On iPhone, add this site to the Home Screen first.");
-  }
-  const p = await Notification.requestPermission();
-  if (p !== "granted") return showToast("Alerts are blocked in browser settings.");
+const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+async function refreshPushBtn() {
+  const b = $("#alertBtn"); let on = false;
+  try { if (pushSupported() && Notification.permission === "granted") { const reg = await navigator.serviceWorker.ready; on = !!(await reg.pushManager.getSubscription()); } } catch {}
+  b.textContent = on ? "Phone alerts are on ✓" : "Turn on phone alerts";
+  b.classList.toggle("button-primary", !on); b.classList.toggle("button-soft", on);
+  return on;
+}
+async function enablePush(silent = false) {
+  if (!pushSupported()) { if (!silent) showToast("Phone alerts are not supported here. On iPhone, add this site to the Home Screen first."); return false; }
+  const p = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
+  if (p !== "granted") { if (!silent) showToast("Alerts are blocked in browser settings."); return false; }
   try {
     const reg = await navigator.serviceWorker.ready;
     const { key } = await api("/api/push/key");
-    if (!key) return showToast("Push is not configured yet.");
+    if (!key) { if (!silent) showToast("Push is not configured yet."); return false; }
     let sub = await reg.pushManager.getSubscription();
     if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) });
     await api("/api/push/subscribe", { method: "POST", body: JSON.stringify(sub) });
-    try { localStorage.setItem("bupPush", "1"); } catch {}
-    $("#alertBtn").textContent = "Phone alerts are on";
-    showToast("Phone alerts are on.");
-  } catch (err) {
-    showToast("Could not turn on alerts. Please try again.");
-  }
+    await refreshPushBtn(); if (!silent) showToast("Phone alerts are on.");
+    return true;
+  } catch (err) { if (!silent) showToast("Could not turn on alerts. Please try again."); return false; }
 }
-$("#alertBtn").addEventListener("click", enablePush);
-try { if (localStorage.getItem("bupPush") === "1" && Notification.permission === "granted") $("#alertBtn").textContent = "Phone alerts are on"; } catch {}
+$("#alertBtn").addEventListener("click", () => enablePush());
+$("#pushTestBtn").addEventListener("click", async () => {
+  const msg = $("#pushTestMsg"); msg.textContent = "Sending…";
+  try {
+    const { report } = await api("/api/push/test", { method: "POST", body: JSON.stringify({}) });
+    if (!report.length) { msg.textContent = "No phone has turned on alerts yet."; return; }
+    const bad = report.filter(r => r.status !== 201);
+    msg.textContent = `${report.length - bad.length} of ${report.length} device(s) accepted the alert.` + (bad.length ? " Problem: " + bad.map(r => (r.status || "error") + " " + (r.reply || r.error || "")).join("; ") : " It should appear on the phone within seconds.");
+  } catch (e) { msg.textContent = e.message; }
+});
+$("#pushAllow").addEventListener("click", async () => { if (await enablePush()) closeModal("pushModal"); });
+async function firstVisitPrompt() {
+  if (!pushSupported()) return;
+  if (Notification.permission === "granted") {
+    try { const reg = await navigator.serviceWorker.ready; if (!(await reg.pushManager.getSubscription())) enablePush(true); } catch {}
+    return;
+  }
+  if (Notification.permission !== "default") return;
+  try { if (localStorage.getItem("bupAsked") === "1") return; localStorage.setItem("bupAsked", "1"); } catch {}
+  setTimeout(() => showModal("pushModal"), 1200);
+}
 setInterval(() => { if (!document.hidden) loadData(true); }, 60000);
 setTheme(document.documentElement.dataset.theme || "light");
 routeHash();
@@ -631,6 +653,6 @@ routeHash();
 buildCtFields(); buildChips();
 initCtSlider();
 setInterval(() => tickCountdown(), 1000);
-loadData();
+loadData(); firstVisitPrompt(); refreshPushBtn();
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
 if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", (e) => { if (e.data && e.data.type === "open" && e.data.hash) location.hash = e.data.hash; });
