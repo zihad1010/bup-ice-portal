@@ -604,7 +604,7 @@ function urlBase64ToUint8Array(b64) {
 }
 const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 async function refreshPushBtn() {
-  const b = $("#alertBtn"); let on = false;
+  const b = $("#alertBtn"); if (!b) return false; let on = false;
   try { if (pushSupported() && Notification.permission === "granted") { const reg = await navigator.serviceWorker.ready; on = !!(await reg.pushManager.getSubscription()); } } catch {}
   b.textContent = on ? "Phone alerts are on ✓" : "Turn on phone alerts";
   b.classList.toggle("button-primary", !on); b.classList.toggle("button-soft", on);
@@ -625,8 +625,8 @@ async function enablePush(silent = false) {
     return true;
   } catch (err) { if (!silent) showToast("Could not turn on alerts. Please try again."); return false; }
 }
-$("#alertBtn").addEventListener("click", () => enablePush());
-$("#pushTestBtn").addEventListener("click", async () => {
+$("#alertBtn")?.addEventListener("click", () => enablePush());
+$("#pushTestBtn")?.addEventListener("click", async () => {
   const msg = $("#pushTestMsg"); msg.textContent = "Sending…";
   try {
     const { report } = await api("/api/push/test", { method: "POST", body: JSON.stringify({}) });
@@ -635,7 +635,7 @@ $("#pushTestBtn").addEventListener("click", async () => {
     msg.textContent = `${report.length - bad.length} of ${report.length} device(s) accepted the alert.` + (bad.length ? " Problem: " + bad.map(r => (r.status || "error") + " " + (r.reply || r.error || "")).join("; ") : " It should appear on the phone within seconds.");
   } catch (e) { msg.textContent = e.message; }
 });
-$("#pushAllow").addEventListener("click", async () => { if (await enablePush()) closeModal("pushModal"); });
+$("#pushAllow")?.addEventListener("click", async () => { if (await enablePush()) closeModal("pushModal"); });
 async function firstVisitPrompt() {
   if (!pushSupported()) return;
   if (Notification.permission === "granted") {
