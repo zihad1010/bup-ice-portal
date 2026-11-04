@@ -21,6 +21,7 @@ function currentMonthLabel() { return new Intl.DateTimeFormat("en", { month: "lo
 const CT_SLOTS = 4;
 const CT_SYLLABUS_MAX = 1500;
 const CT_AUTO_MS = 6000;
+let ctSig = "";
 let ctRefs = [], ctDotEls = [], ctIndex = 0, ctAutoTimer = null, ctHold = 0, ctScrollTimer;
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 function el(tag, className, text) { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
@@ -34,6 +35,20 @@ function getCts() {
     list = (s.ct_datetime || s.syllabus_title || s.syllabus_text) ? [{ title: s.syllabus_title || "", datetime: s.ct_datetime || "", syllabus: s.syllabus_text || "" }] : [];
   }
   return Array.from({ length: CT_SLOTS }, (_, i) => { const c = list[i] || {}; return { title: safeText(c.title), datetime: safeText(c.datetime), syllabus: safeText(c.syllabus) }; });
+}
+function ctSorted() {
+  const now = Date.now();
+  const rank = (c) => Number.isNaN(c.t) ? 2 : (c.t > now ? 0 : 1);
+  return getCts().map((c, i) => ({ ...c, t: c.datetime ? new Date(c.datetime).getTime() : NaN, i }))
+    .sort((a, b) => rank(a) - rank(b) || (rank(a) === 1 ? b.t - a.t : a.t - b.t) || a.i - b.i);
+}
+const ctSigOf = (cts) => cts.map((c) => `${c.title}|${c.datetime}|${c.t > Date.now() ? 1 : 0}`).join("~");
+function openSyllabus(ct, i) {
+  ct = ct || {};
+  $("#sylTitle").textContent = ct.title || `CT ${i + 1}`;
+  $("#sylDate").textContent = "CT date: " + (ct.datetime ? prettyDate(ct.datetime, true) : "Not scheduled");
+  $("#sylBody").textContent = ct.syllabus || "Syllabus will be posted here soon.";
+  showModal("sylModal");
 }
 function buildCtSlider() {
   const track = $("#ctSlider"), dots = $("#ctDots");
@@ -52,19 +67,11 @@ function buildCtSlider() {
       const box = el("div"); const num = el("strong", "", "--"); box.append(num, el("span", "", label)); countdown.append(box); nums[key] = num;
     });
     const syllabusToggle = el("button", "ct-syllabus-toggle", "See syllabus");
-    syllabusToggle.type = "button";
-    syllabusToggle.setAttribute("aria-expanded", "false");
-    const syllabus = el("div", "syllabus ct-syllabus-content"); syllabus.hidden = true;
-    const sText = el("div", "syllabus-text"); sText.tabIndex = 0;
-    syllabus.append(sText);
-    syllabusToggle.addEventListener("click", () => {
-      const open = syllabus.hidden;
-      syllabus.hidden = !open;
-      syllabusToggle.textContent = open ? "Hide syllabus" : "See syllabus";
-      syllabusToggle.setAttribute("aria-expanded", String(open));
-    });
-    card.append(top, countdown, syllabusToggle, syllabus); slide.append(card); track.append(slide);
-    ctRefs.push({ title, meta, status, nums, sText });
+    syllabusToggle.type = "button"; syllabusToggle.setAttribute("aria-haspopup", "dialog");
+    const ref = { title, meta, status, nums, ct: null };
+    syllabusToggle.addEventListener("click", () => openSyllabus(ref.ct, i));
+    card.append(top, countdown, syllabusToggle); slide.append(card); track.append(slide);
+    ctRefs.push(ref);
     const dot = el("button", "ct-dot"); dot.type = "button"; dot.setAttribute("aria-label", `Show CT ${i + 1}`);
     dot.addEventListener("click", () => { goToCt(i, true); startCtAuto(); });
     dots.append(dot); ctDotEls.push(dot);
@@ -98,17 +105,18 @@ function initCtSlider() {
   startCtAuto();
 }
 function renderCountdown() {
-  const cts = getCts();
+  const cts = ctSorted(); ctSig = ctSigOf(cts);
   cts.forEach((ct, i) => {
     const r = ctRefs[i]; if (!r) return;
     r.title.textContent = ct.title || `CT ${i + 1}`;
     r.meta.textContent = "CT date: " + (ct.datetime ? prettyDate(ct.datetime, true) : "Not scheduled");
-    r.sText.textContent = ct.syllabus || "Syllabus will appear here.";
+    r.ct = ct;
   });
   tickCountdown();
 }
 function tickCountdown() {
-  const cts = getCts();
+  const cts = ctSorted();
+  if (ctSigOf(cts) !== ctSig) { renderCountdown(); return; }
   cts.forEach((ct, i) => {
     const r = ctRefs[i]; if (!r) return;
     const setAll = (v) => ["days", "hours", "minutes", "seconds"].forEach(k => r.nums[k].textContent = v);
@@ -123,7 +131,7 @@ function tickCountdown() {
   });
 }
 function noticeCard(n) {
-  const article = el("article", "notice-card" + (n.pinned ? " is-pinned" : ""));
+  const article = el("article", "notice-card" + (n.pinned ? " is-pinned" : "")); article.dataset.noticeId = n.id;
   const meta = el("div", "notice-meta"); meta.append(el("span", "category", n.category), el("span", "pinned", n.pinned ? "Pinned" : ""));
   const footer = el("div", "notice-footer"); footer.append(el("span", "", formatCreated(n.created_at)), el("span", "notice-date", n.relevant_date ? prettyDate(n.relevant_date) : ""));
   article.append(meta, el("h3", "", n.title), el("div", "notice-body", n.body), footer);
@@ -136,17 +144,28 @@ function renderNotices() {
   const pins = appState.notices.filter(n => n.pinned), pl = $("#pinnedList"); pl.innerHTML = "";
   pins.forEach(n => pl.append(noticeCard(n))); $("#pinnedEmpty").classList.toggle("hidden", pins.length > 0);
 }
+const CAT_ICON = { "Class": "i-book", "Assignment": "i-feed", "Quiz / CT": "i-clock", "Exam": "i-exam", "Other": "i-spark" };
+function icon(id) { const ns = "http://www.w3.org/2000/svg", s = document.createElementNS(ns, "svg"), u = document.createElementNS(ns, "use"); s.setAttribute("class", "ic"); s.setAttribute("aria-hidden", "true"); u.setAttribute("href", "#" + id); s.append(u); return s; }
+function iconBtn(cls, label, id, fn) { const b = el("button", "mini-button ic-only " + cls); b.type = "button"; b.title = label; b.setAttribute("aria-label", label); b.append(icon(id)); b.addEventListener("click", fn); return b; }
+function syncChips() { $$("#catChips .chip").forEach(c => c.classList.toggle("active", c.dataset.cat === $("#noticeCategory").value)); }
+function buildChips() {
+  const box = $("#catChips"); box.innerHTML = "";
+  Object.keys(CAT_ICON).forEach(cat => { const b = el("button", "chip"); b.type = "button"; b.dataset.cat = cat; b.append(icon(CAT_ICON[cat]), document.createTextNode(cat)); b.addEventListener("click", () => { $("#noticeCategory").value = cat; syncChips(); }); box.append(b); });
+  syncChips();
+}
+async function togglePin(n) {
+  try { await api(`/api/notices/${n.id}`, { method: "PUT", body: JSON.stringify({ title: n.title, category: n.category, relevant_date: n.relevant_date || "", body: n.body, pinned: !n.pinned }) }); showToast(n.pinned ? "Unpinned." : "Pinned to top."); await loadData(); }
+  catch (error) { showToast(error.message); }
+}
 function renderAdminNotices() {
   const list = $("#adminNoticeList"); list.innerHTML = "";
-  if (!appState.notices.length) { list.textContent = "No notices have been published."; return; }
+  if (!appState.notices.length) { list.append(el("div", "info-empty", "No notices published yet.")); return; }
   for (const n of appState.notices) {
-    const row = document.createElement("div"); row.className = "admin-notice";
-    const info = document.createElement("div"); const title = document.createElement("strong"); title.textContent = n.title;
-    const detail = document.createElement("small"); detail.textContent = `${n.category}${n.pinned ? " · Pinned" : ""} · ${formatCreated(n.created_at)}`; info.append(title, detail);
-    const actions = document.createElement("div"); actions.className = "admin-actions";
-    const edit = document.createElement("button"); edit.className = "mini-button"; edit.textContent = "Edit"; edit.addEventListener("click", () => startEdit(n));
-    const del = document.createElement("button"); del.className = "mini-button danger"; del.textContent = "Delete"; del.addEventListener("click", () => deleteNotice(n.id));
-    actions.append(edit, del); row.append(info, actions); list.append(row);
+    const row = el("div", "admin-notice"), ic = el("span", "an-ic"), info = el("div", "an-text"), actions = el("div", "admin-actions");
+    ic.append(icon(CAT_ICON[n.category] || "i-spark"));
+    info.append(el("strong", "", n.title), el("small", "", `${n.category}${n.pinned ? " · Pinned" : ""} · ${formatCreated(n.created_at)}`));
+    actions.append(iconBtn(n.pinned ? "on" : "", n.pinned ? "Unpin" : "Pin to top", "i-pin", () => togglePin(n)), iconBtn("", "Edit", "i-edit", () => startEdit(n)), iconBtn("danger", "Delete", "i-trash", () => deleteNotice(n.id)));
+    row.append(ic, info, actions); list.append(row);
   }
 }
 async function api(path, options = {}) {
@@ -176,7 +195,7 @@ async function loadData(silent = false) {
   try {
     const data = await api("/api/bootstrap");
     appState.notices = data.notices || []; appState.settings = data.settings || {}; appState.isAdmin = Boolean(data.isAdmin);
-    renderCountdown(); renderNotices(); renderInfoPanels(); updateProfile(); updateNotifs();
+    renderCountdown(); renderNotices(); consumePending(); pendingNotice = null; renderInfoPanels(); updateProfile(); updateNotifs();
     if (appState.isAdmin) { renderAdminNotices(); fillCtForm(); fillStoreForms(); }
   } catch (error) {
     if (silent) return;
@@ -208,10 +227,10 @@ function fillCtForm() {
   $$("#ctFields details").forEach((d, i) => { const t = $("#ctTitle" + i).value.trim(); d.querySelector("summary").textContent = `CT ${i + 1}` + (t ? " — " + t : ""); });
 }
 function resetNoticeForm() {
-  appState.editingId = null; $("#noticeForm").reset(); $("#editingId").value = ""; $("#cancelEdit").classList.add("hidden"); $("#noticeForm button[type=submit]").textContent = "Publish notice"; $("#noticeFormMessage").textContent = "";
+  appState.editingId = null; $("#noticeForm").reset(); syncChips(); $("#editingId").value = ""; $("#cancelEdit").classList.add("hidden"); $("#noticeForm button[type=submit]").textContent = "Publish notice"; $("#noticeFormMessage").textContent = "";
 }
 function startEdit(n) {
-  appState.editingId = n.id; $("#editingId").value = n.id; $("#noticeTitle").value = n.title; $("#noticeCategory").value = n.category; $("#noticeDate").value = n.relevant_date || ""; $("#noticeBody").value = n.body; $("#noticePinned").checked = Boolean(n.pinned); $("#cancelEdit").classList.remove("hidden"); $("#noticeForm button[type=submit]").textContent = "Save changes"; $("#noticeFormMessage").textContent = "Editing: " + n.title; $("#noticeEditor").scrollIntoView({ behavior: "smooth", block: "start" });
+  appState.editingId = n.id; $("#editingId").value = n.id; $("#noticeTitle").value = n.title; $("#noticeCategory").value = n.category; syncChips(); $("#noticeDate").value = n.relevant_date || ""; $("#noticeBody").value = n.body; $("#noticePinned").checked = Boolean(n.pinned); $("#cancelEdit").classList.remove("hidden"); $("#noticeForm button[type=submit]").textContent = "Save changes"; $("#noticeFormMessage").textContent = "Editing: " + n.title; $("#noticeEditor").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 async function deleteNotice(id) {
   if (!confirm("Delete this notice? This cannot be undone.")) return;
@@ -499,7 +518,23 @@ function showView(name, push = true) {
   if (name === "home") goToCt(ctIndex, false);
 }
 $$(".nav-btn").forEach(b => b.addEventListener("click", () => showView(b.dataset.view)));
-window.addEventListener("hashchange", () => showView(location.hash.slice(1), false));
+let pendingNotice = null;
+function focusNotice(id) {
+  const card = $(`#noticeList [data-notice-id="${id}"]`);
+  if (!card) return false;
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 2800);
+  return true;
+}
+function consumePending() { if (pendingNotice && appState.notices.length && focusNotice(pendingNotice)) pendingNotice = null; }
+function routeHash() {
+  const h = location.hash.slice(1), m = /^notice-(\d+)$/.exec(h);
+  if (!m) { showView(h, false); return; }
+  appState.filter = "all"; $$(".filter").forEach(b => b.classList.toggle("active", b.dataset.filter === "all"));
+  showView("feed", false); renderNotices(); pendingNotice = m[1]; consumePending();
+  history.replaceState(null, "", "#feed");
+}
+window.addEventListener("hashchange", routeHash);
 function setTheme(t) {
   document.documentElement.dataset.theme = t;
   try { localStorage.setItem("bupTheme", t); } catch {}
@@ -555,7 +590,7 @@ function openNotifs() {
     const b = el("button", "notif-item" + (freshIds.has(i.id) ? " unread" : "")); b.type = "button";
     const tx = el("div"); tx.append(el("div", "t", i.title), el("div", "s", i.category + " · " + timeAgo(i.t)));
     b.append(el("span", "notif-dot"), tx);
-    b.addEventListener("click", () => { closeModal("notifModal"); showView(i.kind === "notice" ? "feed" : "home"); });
+    b.addEventListener("click", () => { closeModal("notifModal"); if (i.kind === "notice") location.hash = "notice-" + i.id.slice(1); else showView("home"); });
     box.append(b);
   });
   saveSeen(new Set([...(seenSet() || []), ...notifItems.map(i => i.id)])); freshIds = new Set(); $("#notifBadge").classList.add("hidden");
@@ -591,10 +626,11 @@ $("#alertBtn").addEventListener("click", enablePush);
 try { if (localStorage.getItem("bupPush") === "1" && Notification.permission === "granted") $("#alertBtn").textContent = "Phone alerts are on"; } catch {}
 setInterval(() => { if (!document.hidden) loadData(true); }, 60000);
 setTheme(document.documentElement.dataset.theme || "light");
-showView(location.hash.slice(1), false);
+routeHash();
 
-buildCtFields();
+buildCtFields(); buildChips();
 initCtSlider();
 setInterval(() => tickCountdown(), 1000);
 loadData();
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", (e) => { if (e.data && e.data.type === "open" && e.data.hash) location.hash = e.data.hash; });
