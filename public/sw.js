@@ -1,4 +1,4 @@
-const CACHE = "bup-ice-v2";
+const CACHE = "bup-ice-v3";
 const SHELL = ["/", "/index.html", "/styles.css", "/app.js", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/logo-white.png"];
 
 self.addEventListener("install", (event) => {
@@ -56,10 +56,11 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const target = (event.notification.data && event.notification.data.url) || "/";
+  const hash = target.includes("#") ? target.split("#")[1] : "";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       for (const c of list) {
-        if ("focus" in c) { c.navigate(target); return c.focus(); }
+        if ("focus" in c) { c.postMessage({ type: "open", hash }); return c.focus(); }
       }
       return self.clients.openWindow(target);
     })
