@@ -258,6 +258,14 @@ async function handleApi(request, env, url, ctx) {
     return json({ ok: true });
   }
 
+  if (path === "/api/push/unsubscribe" && method === "POST") {
+    const { endpoint } = await readBody(request);
+    if (typeof endpoint === "string" && endpoint) {
+      await env.DB.prepare(`DELETE FROM push_subscriptions WHERE endpoint = ?`).bind(endpoint).run();
+    }
+    return json({ ok: true });
+  }
+
   if (path === "/api/login" && method === "POST") {
     const { password } = await readBody(request);
     const a = await hmacHex("password-check", String(password ?? ""));
